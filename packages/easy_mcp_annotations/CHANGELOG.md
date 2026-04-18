@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-18
+
+### Added
+- Added `generateOpenApi` parameter to `@Mcp` annotation for OpenAPI 3.0 specification generation
+- Comprehensive DartDoc for the new parameter
+
 ## [0.4.2] - 2026-04-15
 
 ### Changed

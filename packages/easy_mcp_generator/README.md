@@ -59,6 +59,70 @@ class MyServer {
 
 **Note:** Use `address: '0.0.0.0'` to listen on all network interfaces (useful for Docker containers or remote access).
 
+### OpenAPI Specification Generation
+
+Generate RESTful OpenAPI 3.0 specifications by setting `generateOpenApi: true`:
+
+```dart
+@Mcp(
+  transport: McpTransport.http,
+  port: 8080,
+  generateOpenApi: true,
+)
+class MyApi {
+  @Tool(description: 'Create a new user')
+  Future<User> createUser({
+    required String name,
+    required String email,
+  }) async { ... }
+
+  @Tool(description: 'Get user by ID')
+  Future<User> getUser({required int id}) async { ... }
+
+  @Tool(description: 'List all users')
+  Future<List<User>> listUsers() async { ... }
+}
+```
+
+This generates `my_api.openapi.json` with RESTful endpoints:
+
+```json
+{
+  "openapi": "3.0.3",
+  "paths": {
+    "/users": {
+      "post": {
+        "summary": "Create a new user",
+        "operationId": "createUser",
+        "requestBody": { ... },
+        "responses": { "201": { ... } }
+      },
+      "get": {
+        "summary": "List all users",
+        "operationId": "listUsers",
+        "responses": { "200": { ... } }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "summary": "Get user by ID",
+        "operationId": "getUser",
+        "parameters": [{ "name": "id", "in": "path" }],
+        "responses": { "200": { ... }, "404": { ... } }
+      }
+    }
+  }
+}
+```
+
+**Features:**
+- ✅ RESTful endpoint mapping (POST for create, GET for list/get, PATCH for update, DELETE for remove)
+- ✅ Resource-based URL patterns (`/users`, `/users/{id}`)
+- ✅ Request/response schemas with validation
+- ✅ Proper HTTP status codes (200, 201, 204, 400, 404)
+- ✅ Parameter metadata from `@Parameter` annotations
+- ✅ Compatible with Swagger UI, API gateways, and code generators
+
 ### Parameter Annotations (Optional)
 
 Use `@Parameter` to provide rich metadata for tool parameters:

@@ -1,6 +1,6 @@
 name: easy_mcp_generator
 description: Build Runner generator that creates MCP server code from @tool annotations.
-version: 0.4.2
+version: 0.5.0
 homepage: https://github.com/cdavis-code/easy_mcp_workspace/tree/main/packages/easy_mcp_generator
 repository: https://github.com/cdavis-code/easy_mcp_workspace/tree/main/packages/easy_mcp_generator
 issue_tracker: https://github.com/cdavis-code/easy_mcp_workspace/issues

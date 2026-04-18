@@ -7,6 +7,7 @@ import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import '../stubs.dart';
 import 'templates.dart';
+import 'openapi_builder.dart';
 
 /// Builder that generates MCP server code from @Mcp and @Tool annotations.
 ///
@@ -27,7 +28,7 @@ import 'templates.dart';
 class McpBuilder extends Builder {
   @override
   final buildExtensions = const {
-    '.dart': ['.mcp.dart', '.mcp.json'],
+    '.dart': ['.mcp.dart', '.mcp.json', '.openapi.json'],
   };
 
   @override
@@ -78,6 +79,20 @@ class McpBuilder extends Builder {
       await buildStep.writeAsString(
         inputId.changeExtension('.mcp.json'),
         jsonEncode(jsonMetadata),
+      );
+    }
+
+    // Optionally generate OpenAPI specification
+    if (_shouldGenerateOpenApi(library)) {
+      final openApiSpec = OpenApiBuilder.build(
+        tools,
+        transport,
+        port,
+        address,
+      );
+      await buildStep.writeAsString(
+        inputId.changeExtension('.openapi.json'),
+        const JsonEncoder.withIndent('  ').convert(openApiSpec),
       );
     }
   }
@@ -719,6 +734,49 @@ class McpBuilder extends Builder {
           final generateJson = reader.peek('generateJson');
           if (generateJson != null) {
             return generateJson.boolValue;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  bool _shouldGenerateOpenApi(LibraryElement library) {
+    const mcpChecker = TypeChecker.fromUrl(
+      'package:easy_mcp_annotations/mcp_annotations.dart#Mcp',
+    );
+
+    // Check top-level functions
+    for (final element in library.topLevelFunctions) {
+      final annotation = mcpChecker.firstAnnotationOf(element);
+      if (annotation != null) {
+        final reader = ConstantReader(annotation);
+        final generateOpenApi = reader.peek('generateOpenApi');
+        if (generateOpenApi != null) {
+          return generateOpenApi.boolValue;
+        }
+      }
+    }
+
+    // Check classes
+    for (final element in library.classes) {
+      final annotation = mcpChecker.firstAnnotationOf(element);
+      if (annotation != null) {
+        final reader = ConstantReader(annotation);
+        final generateOpenApi = reader.peek('generateOpenApi');
+        if (generateOpenApi != null) {
+          return generateOpenApi.boolValue;
+        }
+      }
+      // Check methods within classes
+      for (final method in element.methods) {
+        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
+        if (methodAnnotation != null) {
+          final reader = ConstantReader(methodAnnotation);
+          final generateOpenApi = reader.peek('generateOpenApi');
+          if (generateOpenApi != null) {
+            return generateOpenApi.boolValue;
           }
         }
       }

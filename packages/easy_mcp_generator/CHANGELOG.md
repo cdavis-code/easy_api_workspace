@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-18
+
+### Added
+- OpenAPI 3.0 specification generation with `generateOpenApi: true` parameter
+- RESTful API endpoint mapping following Swagger best practices
+- Automatic resource inference from tool names (e.g., `createUser` → `POST /users`)
+- Full request/response schema generation with validation
+- Proper HTTP status codes (200, 201, 204, 400, 404)
+- `OpenApiBuilder` class for transforming MCP tools to OpenAPI specs
+
 ## [0.4.2] - 2026-04-15
 
 ### Changed

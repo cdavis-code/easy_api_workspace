@@ -118,6 +118,22 @@ class Mcp {
   /// Defaults to false for backward compatibility.
   final bool autoClassPrefix;
 
+  /// Whether to generate an OpenAPI 3.0 specification file.
+  ///
+  /// When true, the generator will create a `.openapi.json` file containing
+  /// a RESTful OpenAPI 3.0 specification that represents the tools as standard
+  /// API endpoints following REST conventions.
+  ///
+  /// The generated spec maps tool operations to HTTP methods:
+  /// - Create operations → POST /{resource}
+  /// - List operations → GET /{resource}
+  /// - Get by ID → GET /{resource}/{id}
+  /// - Update operations → PATCH /{resource}/{id}
+  /// - Delete operations → DELETE /{resource}/{id}
+  ///
+  /// Defaults to false.
+  final bool generateOpenApi;
+
   /// Creates an MCP configuration annotation.
   ///
   /// [transport] determines the communication protocol (stdio or HTTP).
@@ -126,6 +142,7 @@ class Mcp {
   /// [address] specifies the HTTP bind address (default: '127.0.0.1').
   /// [toolPrefix] adds a prefix to all tool names in this scope.
   /// [autoClassPrefix] automatically prefixes tool names with class name.
+  /// [generateOpenApi] controls whether to generate OpenAPI specification.
   const Mcp({
     this.transport = McpTransport.stdio,
     this.generateJson = false,
@@ -133,6 +150,7 @@ class Mcp {
     this.address = '127.0.0.1',
     this.toolPrefix,
     this.autoClassPrefix = false,
+    this.generateOpenApi = false,
   });
 }
 

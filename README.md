@@ -23,11 +23,11 @@ Easy MCP allows you to expose Dart library functions as MCP tools using simple a
 
 ```yaml
 dependencies:
-  easy_mcp_annotations: ^0.4.2
+  easy_mcp_annotations: ^0.5.0
 
 dev_dependencies:
   build_runner: ^2.4.0
-  easy_mcp_generator: ^0.4.2
+  easy_mcp_generator: ^0.5.0
 ```
 
 ### 2. Annotate Your Functions
@@ -129,6 +129,26 @@ Future<User> createUser({
 
 **Note:** `@Parameter` is optional. By default, the generator extracts parameter information from Dart types and method signatures.
 
+### OpenAPI Specification Generation
+
+Generate RESTful OpenAPI 3.0 specifications from your MCP tools:
+
+```dart
+@Mcp(
+  generateOpenApi: true,  // Enable OpenAPI generation
+)
+void configureMcp() { ... }
+```
+
+This generates a `.openapi.json` file with:
+- **RESTful endpoints** - Tools mapped to standard HTTP methods (GET, POST, PATCH, DELETE)
+- **Resource-based URLs** - e.g., `/users`, `/users/{id}` instead of `/tools/createUser`
+- **Request/response schemas** - Full type information with validation
+- **Proper status codes** - 200, 201, 204, 400, 404 as appropriate
+- **Tags and operation IDs** - For API organization and client generation
+
+The generated spec follows Swagger API design best practices and can be used with Swagger UI, API gateways, and client code generation tools.
+
 ## Features
 
 - **AST-based parsing** - Uses `dart:analyzer` for reliable code extraction
@@ -139,6 +159,7 @@ Future<User> createUser({
 - **Automatic schema generation** - Dart types mapped to JSON Schema
 - **Optional parameter support** - Named and optional positional parameters
 - **Doc comment extraction** - Falls back to doc comments when description not provided
+- **OpenAPI 3.0 specification** - Auto-generate RESTful API documentation from MCP tools
 
 ## Development
 
