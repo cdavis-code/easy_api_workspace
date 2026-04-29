@@ -62,10 +62,27 @@ class McpBuilder extends Builder {
     final port = _findPort(library);
     final address = _findAddress(library);
 
+    // Extract code mode configuration from @Mcp annotation
+    final codeMode = _findCodeMode(library);
+    final codeModeTimeout = _findCodeModeTimeout(library);
+    final logErrors = _findLogErrors(library);
+
     // Generate the appropriate server code based on transport type
     final generated = transport == 'http'
-        ? HttpTemplate.generate(tools, port, address)
-        : StdioTemplate.generate(tools);
+        ? HttpTemplate.generate(
+            tools,
+            port,
+            address,
+            codeMode: codeMode,
+            codeModeTimeout: codeModeTimeout,
+            logErrors: logErrors,
+          )
+        : StdioTemplate.generate(
+            tools,
+            codeMode: codeMode,
+            codeModeTimeout: codeModeTimeout,
+            logErrors: logErrors,
+          );
 
     // Write the generated server code
     await buildStep.writeAsString(
@@ -84,12 +101,7 @@ class McpBuilder extends Builder {
 
     // Optionally generate OpenAPI specification
     if (_shouldGenerateOpenApi(library)) {
-      final openApiSpec = OpenApiBuilder.build(
-        tools,
-        transport,
-        port,
-        address,
-      );
+      final openApiSpec = OpenApiBuilder.build(tools, transport, port, address);
       await buildStep.writeAsString(
         inputId.changeExtension('.openapi.json'),
         const JsonEncoder.withIndent('  ').convert(openApiSpec),
@@ -121,12 +133,19 @@ class McpBuilder extends Builder {
         toolPrefix,
       );
 
+      // Extract codeMode from @Tool annotation (defaults to true)
+      final toolCodeMode = _extractToolCodeMode(toolAnnotation);
+      // Extract codeModeVisible from @Tool annotation (defaults to false)
+      final toolCodeModeVisible = _extractToolCodeModeVisible(toolAnnotation);
+
       tools.add(<String, dynamic>{
         'name': toolName,
         'methodName': element.name ?? 'unnamed',
         'description': description,
         'parameters': parameters,
         'isAsync': isAsync,
+        'codeMode': toolCodeMode,
+        'codeModeVisible': toolCodeModeVisible,
       });
     }
 
@@ -160,6 +179,11 @@ class McpBuilder extends Builder {
           toolName = '$toolPrefix$toolName';
         }
 
+        // Extract codeMode from @Tool annotation (defaults to true)
+        final toolCodeMode = _extractToolCodeMode(toolAnnotation);
+        // Extract codeModeVisible from @Tool annotation (defaults to false)
+        final toolCodeModeVisible = _extractToolCodeModeVisible(toolAnnotation);
+
         tools.add(<String, dynamic>{
           'name': toolName,
           'methodName': method.name ?? 'unnamed',
@@ -168,6 +192,8 @@ class McpBuilder extends Builder {
           'isAsync': isAsync,
           'className': element.name,
           'isStatic': method.isStatic,
+          'codeMode': toolCodeMode,
+          'codeModeVisible': toolCodeModeVisible,
         });
       }
     }
@@ -1060,6 +1086,173 @@ class McpBuilder extends Builder {
     final autoPrefixField = reader.peek('autoClassPrefix');
     if (autoPrefixField != null) {
       return autoPrefixField.boolValue;
+    }
+    return null;
+  }
+
+  bool _extractToolCodeMode(DartObject? toolAnnotation) {
+    if (toolAnnotation == null) return true;
+    final reader = ConstantReader(toolAnnotation);
+    final codeModeField = reader.peek('codeMode');
+    if (codeModeField != null && !codeModeField.isNull) {
+      return codeModeField.boolValue;
+    }
+    return true; // Default to true
+  }
+
+  /// Extracts the `codeModeVisible` field from a `@Tool` annotation.
+  ///
+  /// When the enclosing `@Mcp` has `codeMode: true`, only tools with
+  /// `codeModeVisible: true` are registered in the standard tools/list.
+  /// Defaults to `false` so code mode hides standard tools by default.
+  bool _extractToolCodeModeVisible(DartObject? toolAnnotation) {
+    if (toolAnnotation == null) return false;
+    final reader = ConstantReader(toolAnnotation);
+    final field = reader.peek('codeModeVisible');
+    if (field != null && !field.isNull) {
+      return field.boolValue;
+    }
+    return false;
+  }
+
+  /// Finds the code mode setting from @Mcp annotations in the library.
+  ///
+  /// When true, the generated server includes `search` and `execute` tools
+  /// that allow LLMs to discover and orchestrate multiple tool calls in a
+  /// single JavaScript program.
+  ///
+  /// Returns false if not explicitly specified.
+  bool _findCodeMode(LibraryElement library) {
+    const mcpChecker = TypeChecker.fromUrl(
+      'package:easy_mcp_annotations/mcp_annotations.dart#Mcp',
+    );
+
+    // Check top-level functions
+    for (final element in library.topLevelFunctions) {
+      final annotation = mcpChecker.firstAnnotationOf(element);
+      if (annotation != null) {
+        final codeMode = _extractCodeModeFromAnnotation(annotation);
+        if (codeMode != null) return codeMode;
+      }
+    }
+
+    // Check classes
+    for (final element in library.classes) {
+      final annotation = mcpChecker.firstAnnotationOf(element);
+      if (annotation != null) {
+        final codeMode = _extractCodeModeFromAnnotation(annotation);
+        if (codeMode != null) return codeMode;
+      }
+      // Check methods within classes
+      for (final method in element.methods) {
+        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
+        if (methodAnnotation != null) {
+          final codeMode = _extractCodeModeFromAnnotation(methodAnnotation);
+          if (codeMode != null) return codeMode;
+        }
+      }
+    }
+
+    return false; // Default to false for backward compatibility
+  }
+
+  bool? _extractCodeModeFromAnnotation(DartObject annotation) {
+    final reader = ConstantReader(annotation);
+    final codeModeField = reader.peek('codeMode');
+    if (codeModeField != null && !codeModeField.isNull) {
+      return codeModeField.boolValue;
+    }
+    return null;
+  }
+
+  /// Finds the code mode timeout from @Mcp annotations in the library.
+  ///
+  /// Returns 30 if no timeout is explicitly specified.
+  int _findCodeModeTimeout(LibraryElement library) {
+    const mcpChecker = TypeChecker.fromUrl(
+      'package:easy_mcp_annotations/mcp_annotations.dart#Mcp',
+    );
+
+    // Check top-level functions
+    for (final element in library.topLevelFunctions) {
+      final annotation = mcpChecker.firstAnnotationOf(element);
+      if (annotation != null) {
+        final timeout = _extractCodeModeTimeoutFromAnnotation(annotation);
+        if (timeout != null) return timeout;
+      }
+    }
+
+    // Check classes
+    for (final element in library.classes) {
+      final annotation = mcpChecker.firstAnnotationOf(element);
+      if (annotation != null) {
+        final timeout = _extractCodeModeTimeoutFromAnnotation(annotation);
+        if (timeout != null) return timeout;
+      }
+      // Check methods within classes
+      for (final method in element.methods) {
+        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
+        if (methodAnnotation != null) {
+          final timeout = _extractCodeModeTimeoutFromAnnotation(
+            methodAnnotation,
+          );
+          if (timeout != null) return timeout;
+        }
+      }
+    }
+
+    return 30; // Default timeout
+  }
+
+  int? _extractCodeModeTimeoutFromAnnotation(DartObject annotation) {
+    final reader = ConstantReader(annotation);
+    final timeoutField = reader.peek('codeModeTimeout');
+    if (timeoutField != null && !timeoutField.isNull) {
+      return timeoutField.intValue;
+    }
+    return null;
+  }
+
+  /// Extracts the logErrors flag from the @Mcp annotation.
+  bool _findLogErrors(LibraryElement library) {
+    const mcpChecker = TypeChecker.fromUrl(
+      'package:easy_mcp_annotations/mcp_annotations.dart#Mcp',
+    );
+
+    // Check top-level functions
+    for (final element in library.topLevelFunctions) {
+      final annotation = mcpChecker.firstAnnotationOf(element);
+      if (annotation != null) {
+        final value = _extractLogErrorsFromAnnotation(annotation);
+        if (value != null) return value;
+      }
+    }
+
+    // Check classes
+    for (final element in library.classes) {
+      final annotation = mcpChecker.firstAnnotationOf(element);
+      if (annotation != null) {
+        final value = _extractLogErrorsFromAnnotation(annotation);
+        if (value != null) return value;
+      }
+      // Check methods within classes
+      for (final method in element.methods) {
+        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
+        if (methodAnnotation != null) {
+          final value = _extractLogErrorsFromAnnotation(methodAnnotation);
+          if (value != null) return value;
+        }
+      }
+    }
+
+    return false; // Default to false
+  }
+
+  bool? _extractLogErrorsFromAnnotation(DartObject annotation) {
+    final reader = ConstantReader(annotation);
+    final field = reader.peek('logErrors');
+    if (field != null && !field.isNull) {
+      return field.boolValue;
     }
     return null;
   }

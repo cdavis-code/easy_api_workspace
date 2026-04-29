@@ -6,6 +6,18 @@
 
 Example demonstrating how to use `easy_mcp_annotations` and `easy_mcp_generator`. This example showcases a realistic many-to-many domain model where **Users** and **Todos** have bidirectional relationships — a todo can be assigned to multiple users, and a user can have multiple todos.
 
+## 📋 Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Transport Modes](#transport-modes)
+- [Available Tools](#available-tools)
+- [Code Mode](#code-mode)
+- [Testing & Validation](#testing--validation)
+- [Generated Artifacts](#generated-artifacts)
+- [Project Structure](#project-structure)
+- [Data Model](#data-model)
+
 ## Prerequisites
 
 This example is part of the `easy_mcp_workspace`. From the project root:
@@ -14,7 +26,12 @@ This example is part of the `easy_mcp_workspace`. From the project root:
 dart pub get
 ```
 
-## Usage
+**Additional Requirements:**
+- **Dart SDK** 3.11+ (for running the servers)
+- **Node.js** 22.7.5+ (for code mode sandbox and MCP Inspector)
+- **build_runner** (for code generation)
+
+## 🚀 Quick Start
 
 ### 1. Add annotations to your library
 
@@ -154,9 +171,27 @@ dart run build_runner build --delete-conflicting-outputs --watch
 ```
 
 This generates:
-- `bin/example.mcp.dart` — Generated MCP server using `dart_mcp` that aggregates all tools from imported libraries
+- `bin/example.mcp.dart` — Generated HTTP MCP server
+- `bin/example.stdio.mcp.dart` — Generated stdio MCP server
+- `bin/example.mcp.json` — Tool metadata (JSON format)
+- `bin/example.openapi.json` — OpenAPI 3.0 specification
+- `bin/example.stdio.mcp.json` — Tool metadata for stdio version
+- `bin/example.stdio.openapi.json` — OpenAPI 3.0 spec for stdio version
 
 The generator discovers all `@Tool`-annotated methods from libraries imported by the `@Mcp`-annotated entry point and registers them in a single MCP server.
+
+### 3. Run the server
+
+**stdio Transport (Recommended for Testing):**
+```bash
+dart run example/bin/example.stdio.mcp.dart
+```
+
+**HTTP Transport:**
+```bash
+dart run example/bin/example.mcp.dart
+# Server listens on http://0.0.0.0:8080
+```
 
 ## Available Tools
 
@@ -203,114 +238,503 @@ The generated MCP server exposes 14 tools organized by store:
 | `description` | `String?` | auto-extract | Tool description (falls back to doc comment) |
 | `icons` | `List<String>?` | `null` | Icon URLs |
 
-## Running the Generated Server
+## 🚚 Transport Modes
 
-After running `build_runner`, run the generated server:
+This example supports **two transport protocols** for MCP communication:
 
+### stdio Transport (Default - Recommended for Testing)
+
+- **Communication**: JSON-RPC 2.0 over stdin/stdout
+- **Best for**: CLI-based MCP clients, testing with MCP Inspector
+- **Advantages**: 
+  - Reliable bidirectional communication
+  - Proper MCP protocol support
+  - No HTTP overhead
+  - Easier debugging
+  - Official MCP Inspector support
+
+**Run:**
 ```bash
-dart run example/bin/example.mcp.dart
+dart run example/bin/example.stdio.mcp.dart
 ```
-
-### stdio Transport (Default)
-
-The server uses `dart_mcp` with stdio transport. It communicates via JSON-RPC 2.0 over stdin/stdout.
 
 ### HTTP Transport
 
-If you configured HTTP transport with custom port/address (as shown in the example above with port 8080 and address '0.0.0.0'):
+- **Communication**: JSON-RPC 2.0 over HTTP POST requests
+- **Best for**: Production deployment, web-based integrations
+- **Configuration**:
+  - Port: 8080
+  - Address: 0.0.0.0 (all interfaces)
+- **Advantages**:
+  - Network accessible
+  - Firewall-friendly
+  - Standard web protocol
 
+**Run:**
 ```bash
 dart run example/bin/example.mcp.dart
-# Server will listen on http://0.0.0.0:8080
+# Server listens on http://0.0.0.0:8080
 ```
 
-With default settings (port 3000, address '127.0.0.1'):
+**Note:** The stdio transport is recommended for development and testing. See [Testing & Validation](#testing--validation) for detailed testing approaches.
+
+---
+
+## 🎯 Code Mode
+
+**Code Mode** is a powerful feature that enables LLMs to generate JavaScript programs that orchestrate multiple tool calls in a single request.
+
+### What is Code Mode?
+
+Code Mode provides a Node.js sandbox where you can write JavaScript that:
+- Calls multiple MCP tools sequentially or in parallel
+- Uses `await` for sequential execution
+- Uses `Promise.all()` for parallel execution
+- Returns structured results
+- Has access to all available tools via `external_*` functions
+
+### How It Works
+
+When `@Mcp(codeMode: true)` is enabled, the generated server includes:
+
+1. **`search` Tool** - Search across available tools by name or description
+   - Parameters: `query` (required), `detail_level` (optional: 'brief', 'detailed', 'full')
+   - AND-matching on search terms
+   - Returns matching tools with parameter information
+
+2. **`execute` Tool** - Execute JavaScript code with tool access
+   - Parameters: `code` (required) - JavaScript code to execute
+   - Provides `call_tool(name, params)` for generic tool invocation
+   - Provides `external_<toolName>(args)` convenience wrappers
+   - All calls are async - use `await` for sequential, `Promise.all()` for parallel
+
+3. **JavaScript Sandbox** - Isolated Node.js execution environment
+   - 64MB memory limit
+   - Configurable timeout (default: 30 seconds)
+   - IPC via JSON-lines on stdin/stdout
+   - Automatic cleanup of temp files
+   - Blocked dangerous globals (`require`, `__dirname`, `__filename`, `process.exit()`)
+
+### Code Mode Examples
+
+**Example 1: Sequential Tool Calls**
+```javascript
+// Create a user, then create and assign a todo
+const user = await external_createUser({
+  name: 'CodeMode Tester',
+  email: 'tester@codemode.test'
+});
+
+const todo = await external_createTodo({
+  title: 'Test code mode workflow'
+});
+
+await external_assignTodoToUser({
+  todoId: todo.id,
+  userId: user.id
+});
+
+`Created user "${user.name}" with todo "${todo.title}"`;
+```
+
+**Example 2: Parallel Tool Calls**
+```javascript
+// Fetch users and todos simultaneously
+const [users, todos] = await Promise.all([
+  external_listUsers({}),
+  external_listTodos({})
+]);
+
+`Users: ${users.length}, Todos: ${todos.length}`;
+```
+
+**Example 3: Search Then Execute**
+```javascript
+// Search for user-related tools
+const searchResults = await external_search({
+  query: 'user create',
+  detail_level: 'detailed'
+});
+
+// Then create a user
+const newUser = await external_createUser({
+  name: 'Search Result User',
+  email: 'search@test.com'
+});
+
+`Found ${searchResults.length} tools, created user ID ${newUser.id}`;
+```
+
+**Example 4: Complex Workflow with Filtering**
+```javascript
+// Get all users and their todo counts
+const users = await external_listUsers({});
+
+const results = [];
+for (const user of users) {
+  const todos = await external_getTodosForUser({ userId: user.id });
+  results.push({
+    name: user.name,
+    email: user.email,
+    todoCount: todos.length,
+    todos: todos.map(t => t.title)
+  });
+}
+
+JSON.stringify(results, null, 2);
+```
+
+### Code Mode Security
+
+- ✅ 64MB memory limit for Node.js process
+- ✅ 30-second timeout (configurable via `@Mcp(codeModeTimeout: X)`)
+- ✅ Blocked dangerous globals
+- ✅ Isolated temp directory (cleaned up after execution)
+- ✅ Generic error messages (no internal details leaked)
+- ✅ Tool filtering: Only tools with `codeMode != false` are exposed
+
+**Note:** Destructive operations like `deleteUser` have `@Tool(codeMode: false)` and are intentionally unavailable from code mode to prevent accidental data loss.
+
+---
+
+##  Testing & Validation
+
+This example provides **multiple testing approaches** to validate all functionality:
+
+### 1. MCP Inspector (Recommended)
+
+**Best for**: Interactive testing, exploring tools, testing code mode
+
+**Launch:**
+```bash
+cd example
+./launch_inspector.sh
+```
+
+This will:
+- Clean up existing test data
+- Launch MCP Inspector in your browser (http://localhost:6274)
+- Auto-connect to the stdio server
+- Display all 15 tools in the Tools tab
+
+**What You Can Test:**
+- ✅ All 15 individual tool calls
+- ✅ Code mode sequential execution
+- ✅ Code mode parallel execution
+- ✅ Tool search functionality
+- ✅ Data persistence across calls
+- ✅ Cross-store operations (users ↔ todos)
+- ✅ Many-to-many relationships
+- ✅ Error handling
+
+**See:** [TESTING.md](TESTING.md) for detailed testing guide with MCP Inspector setup, code mode examples, and troubleshooting.
+
+### 2. MCP Inspector CLI Mode
+
+**Best for**: Automated testing, scripting, CI/CD
+
+**List available tools:**
+```bash
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/list
+```
+
+**Call individual tools:**
+```bash
+# UserStore tools
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name listUsers
+
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name createUser --tool-arg 'name=Test User' --tool-arg 'email=test@example.com'
+
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name getUser --tool-arg 'id=1'
+
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name searchUsers --tool-arg 'query=Alice'
+
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name getUserTodos --tool-arg 'userId=1'
+
+# TodoStore tools
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name createTodo --tool-arg 'title=Buy groceries'
+
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name listTodos
+
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name completeTodo --tool-arg 'id=1'
+
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name assignTodoToUser --tool-arg 'todoId=1' --tool-arg 'userId=1'
+
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name removeTodoFromUser --tool-arg 'todoId=1' --tool-arg 'userId=1'
+
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name getTodosForUser --tool-arg 'userId=1'
+
+# Code Mode tools
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name search --tool-arg 'query=user create' --tool-arg 'detail_level=detailed'
+
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name execute --tool-arg 'code=const users = await external_listUsers({}); `Found ${users.length} users`'
+```
+
+### 3. Bash Test Script
+
+**Best for**: Automated testing, HTTP transport validation
+
+**Run:**
+```bash
+cd example
+./test_code_mode.sh
+```
+
+**What It Tests:**
+- ✅ MCP protocol initialization handshake
+- ✅ Tool listing
+- ✅ Individual tool calls
+- ✅ Code mode sequential execution
+- ✅ Code mode parallel execution
+- ✅ Full workflow orchestration
+
+### 4. Node.js Test Client
+
+**Best for**: Programmatic testing, custom test scenarios
+
+**Run:**
+```bash
+cd example
+node test_mcp_http.js
+```
+
+**What It Tests:**
+- ✅ HTTP transport communication
+- ✅ Full MCP protocol sequence
+- ✅ Tool execution via HTTP
+- ✅ Error handling and timeouts
+
+### 5. Manual curl Testing
+
+**Best for**: Low-level protocol validation, debugging
+
+**HTTP Transport:**
+```bash
+# Initialize
+curl -s -X POST http://localhost:8080 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc":"2.0",
+    "id":1,
+    "method":"initialize",
+    "params":{
+      "protocolVersion":"2024-11-05",
+      "capabilities":{},
+      "clientInfo":{"name":"test","version":"1.0"}
+    }
+  }' | jq .
+
+# List tools
+curl -s -X POST http://localhost:8080 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc":"2.0",
+    "id":2,
+    "method":"tools/list",
+    "params":{}
+  }' | jq .
+
+# Call a tool
+curl -s -X POST http://localhost:8080 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc":"2.0",
+    "id":3,
+    "method":"tools/call",
+    "params":{
+      "name":"listUsers",
+      "arguments":{}
+    }
+  }' | jq .
+```
+
+### 6. stdio Pipe Testing
+
+**Best for**: Validating stdio protocol, automated testing
 
 ```bash
-dart run example/bin/example.mcp.dart
-# Server will listen on http://127.0.0.1:3000
+# Full initialization sequence with tool listing
+{
+  echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+  echo '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+  echo '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+} | dart run bin/example.stdio.mcp.dart 2>/dev/null | \
+  grep -A 100 '"id":2' | \
+  jq '.result.tools[] | .name'
+
+# Expected output:
+# "createUser"
+# "listUsers"
+# "getUser"
+# "searchUsers"
+# "deleteUser"
+# "createTodo"
+# "listTodos"
+# "getTodo"
+# "completeTodo"
+# "deleteTodo"
+# "assignTodoToUser"
+# "removeTodoFromUser"
+# "getTodosForUser"
+# "getUserTodos"
+# "execute_code"
+# "search"
 ```
 
-The HTTP server accepts POST requests with JSON-RPC 2.0 payloads.
+### Testing Checklist
+
+**Individual Tools (15 tools):**
+- [ ] `createUser` - Create a new user
+- [ ] `listUsers` - List all users
+- [ ] `getUser` - Get user by ID
+- [ ] `searchUsers` - Search users by query
+- [ ] `deleteUser` - Delete a user (codeMode: false)
+- [ ] `getUserTodos` - Get all todos assigned to a user
+- [ ] `createTodo` - Create a new todo
+- [ ] `listTodos` - List all todos
+- [ ] `getTodo` - Get todo by ID
+- [ ] `completeTodo` - Mark a todo as completed
+- [ ] `deleteTodo` - Delete a todo
+- [ ] `assignTodoToUser` - Assign a todo to a user
+- [ ] `removeTodoFromUser` - Remove a user from a todo
+- [ ] `getTodosForUser` - Get all todos assigned to a user
+
+**Code Mode Tools (2 tools):**
+- [ ] `search` - Search across available tools
+- [ ] `execute_code` - Execute JavaScript code with tool access
+
+**Code Mode Functionality:**
+- [ ] Sequential tool calls with `await`
+- [ ] Parallel tool calls with `Promise.all()`
+- [ ] Tool discovery via `search`
+- [ ] Complex workflows with filtering
+- [ ] Error handling in JavaScript sandbox
+- [ ] Timeout enforcement
+- [ ] Memory limit enforcement
+- [ ] Tool exclusion (`codeMode: false`)
+
+**Protocol Validation:**
+- [ ] MCP initialization handshake
+- [ ] Tool listing via `tools/list`
+- [ ] Tool execution via `tools/call`
+- [ ] Error responses
+- [ ] JSON-RPC 2.0 compliance
+
+**Data Persistence:**
+- [ ] Data survives across tool calls
+- [ ] Many-to-many relationships maintained
+- [ ] Automatic cleanup on deletion
+- [ ] JSON file persistence (`users.json`, `todos.json`)
+
+**Transport Modes:**
+- [ ] stdio transport communication
+- [ ] HTTP transport communication
+- [ ] Bidirectional messaging
+- [ ] Notification handling
+
+---
+
+## 📦 Generated Artifacts
+
+After running `build_runner`, the following files are generated:
+
+### Server Files
+- **`example.mcp.dart`** - HTTP MCP server (27.5KB)
+  - Shelf-based HTTP server
+  - Port: 8080, Address: 0.0.0.0
+  - Full code mode support
+  
+- **`example.stdio.mcp.dart`** - stdio MCP server (26.1KB)
+  - JSON-RPC over stdin/stdout
+  - Full code mode support
+  - Recommended for testing
+
+### Metadata Files
+- **`example.mcp.json`** - Tool metadata for HTTP server
+  - JSON format tool descriptions
+  - Parameter schemas
+  - Tool capabilities
+  
+- **`example.stdio.mcp.json`** - Tool metadata for stdio server
+  - Same format as HTTP version
+
+### OpenAPI Specifications
+- **`example.openapi.json`** - OpenAPI 3.0 spec for HTTP server
+  - RESTful API documentation
+  - Request/response schemas
+  - Can be used with Swagger UI
+  
+- **`example.stdio.openapi.json`** - OpenAPI 3.0 spec for stdio server
+  - Same format as HTTP version
+
+### Generated Code Features
+
+Both server files include:
+- 15 tool registrations with JSON schemas
+- Tool execution handlers with error handling
+- Result serialization logic
+- **Code mode infrastructure** (when `codeMode: true`):
+  - `search` and `execute` tool registrations
+  - `_codeModeToolSpecs` registry
+  - `_search` handler with AND-matching
+  - `_execute` handler with timeout
+  - `_runCodeSandbox` method for Node.js execution
+  - `_buildJsWrapper` for JavaScript sandbox generation
+  - `_dispatchCodeModeToolCall` for tool routing
+  - JavaScript IPC layer with `call_tool` and `external_*` functions
+
+---
 
 ### Testing the Server
 
-Use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) — the official testing tool for MCP servers — to test all tools via CLI.
+For detailed testing instructions, see **[TESTING.md](TESTING.md)** — a comprehensive guide covering:
+- MCP Inspector setup and connection
+- Code mode testing with JavaScript examples
+- Tool discovery and orchestration
+- Debug output configuration (`logErrors`)
+- Troubleshooting common issues
 
-**Prerequisites:** Node.js 22.7.5+
-
-**List available tools**
-
+**Quick Start with MCP Inspector:**
 ```bash
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/list
+cd example
+./launch_inspector.sh
 ```
 
-**Call tools**
+This launches the interactive web UI at `http://localhost:6274` where you can:
+- Explore all 15 tools
+- Test individual tool calls
+- Test code mode with JavaScript
+- View server notifications
+- Inspect tool schemas
 
-```bash
-# UserStore tools
+---
 
-# Call listUsers (no parameters)
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name listUsers
-
-# Call createUser with parameters
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name createUser --tool-arg 'name=Test User' --tool-arg 'email=test@example.com'
-
-# Call getUser with ID
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name getUser --tool-arg 'id=1'
-
-# Call searchUsers with query
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name searchUsers --tool-arg 'query=Alice'
-
-# Call getUserTodos
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name getUserTodos --tool-arg 'userId=1'
-
-# TodoStore tools
-
-# Call createTodo
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name createTodo --tool-arg 'title=Buy groceries'
-
-# Call listTodos
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name listTodos
-
-# Call completeTodo
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name completeTodo --tool-arg 'id=1'
-
-# Call assignTodoToUser
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name assignTodoToUser --tool-arg 'todoId=1' --tool-arg 'userId=1'
-
-# Call removeTodoFromUser
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name removeTodoFromUser --tool-arg 'todoId=1' --tool-arg 'userId=1'
-
-# Call getTodosForUser
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name getTodosForUser --tool-arg 'userId=1'
-```
-
-**Alternative: Web UI mode**
-
-For interactive browser-based testing, run without the `--cli` flag:
-
-```bash
-npx @modelcontextprotocol/inspector dart run example/bin/example.mcp.dart
-```
-
-Then open `http://localhost:6274` in your browser.
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 example/
 ├── bin/
-│   ├── example.dart          # Entry point with @Mcp annotation
-│   └── example.mcp.dart      # Generated MCP server (aggregates all tools)
+│   ├── example.dart                  # Entry point with @Mcp (HTTP transport)
+│   ├── example.mcp.dart              # Generated HTTP MCP server
+│   ├── example.mcp.json              # Tool metadata (HTTP)
+│   ├── example.openapi.json          # OpenAPI 3.0 spec (HTTP)
+│   ├── example.stdio.dart            # Entry point with @Mcp (stdio transport)
+│   ├── example.stdio.mcp.dart        # Generated stdio MCP server
+│   ├── example.stdio.mcp.json        # Tool metadata (stdio)
+│   └── example.stdio.openapi.json    # OpenAPI 3.0 spec (stdio)
 ├── lib/
 │   └── src/
-│       ├── todo.dart          # Todo model
-│       ├── todo_store.dart    # TodoStore with @Tool methods
-│       ├── user.dart          # User model
-│       └── user_store.dart    # UserStore with @Tool methods
-├── build.yaml
-└── pubspec.yaml
+│       ├── todo.dart                  # Todo model
+│       ├── todo_store.dart            # TodoStore with @Tool methods
+│       ├── user.dart                  # User model
+│       └── user_store.dart            # UserStore with @Tool methods
+├── build.yaml                         # Build runner configuration
+├── launch_inspector.sh                # MCP Inspector launcher script
+├── test_code_mode.sh                  # Bash test script for HTTP transport
+├── test_mcp_http.js                   # Node.js test client for HTTP transport
+├── TESTING.md                         # Comprehensive testing guide with MCP Inspector
+├── README.md                          # This file
+└── pubspec.yaml                       # Package dependencies
 ```
 
 ## Data Model
@@ -387,6 +811,10 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       _assignTodoToUser,
     );
     // ... more tools from both stores
+    
+    // Code mode tools (when codeMode: true)
+    registerTool(Tool(name: 'search', ...), _search);
+    registerTool(Tool(name: 'execute', ...), _execute);
   }
 
   FutureOr<CallToolResult> _createUser(CallToolRequest request) async {
@@ -403,5 +831,121 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
   }
 
   // ... more handlers
+  
+  // Code mode handlers (when codeMode: true)
+  FutureOr<CallToolResult> _search(CallToolRequest request) async { ... }
+  FutureOr<CallToolResult> _execute(CallToolRequest request) async { ... }
+  Future<String?> _runCodeSandbox(String userCode, int timeoutSeconds) async { ... }
 }
 ```
+
+---
+
+## 📊 Summary of Available Tests and Functionality
+
+### What You Can Test
+
+**✅ 15 Individual MCP Tools:**
+
+**UserStore (6 tools):**
+1. `createUser(name, email)` - Create a new user
+2. `getUser(id)` - Get user by ID
+3. `listUsers()` - List all users
+4. `deleteUser(id)` - Delete a user (codeMode: false)
+5. `searchUsers(query)` - Search users by query
+6. `getUserTodos(userId)` - Get all todos assigned to a user
+
+**TodoStore (8 tools):**
+7. `createTodo(title)` - Create a new todo
+8. `getTodo(id)` - Get todo by ID
+9. `listTodos()` - List all todos
+10. `deleteTodo(id)` - Delete a todo
+11. `completeTodo(id)` - Mark a todo as completed
+12. `assignTodoToUser(todoId, userId)` - Assign a todo to a user
+13. `removeTodoFromUser(todoId, userId)` - Remove a user from a todo
+14. `getTodosForUser(userId)` - Get all todos assigned to a user
+
+**Code Mode (2 tools):**
+15. `search(query, detail_level?)` - Search across available tools
+16. `execute_code(code)` - Execute JavaScript with tool access
+
+**✅ Code Mode Functionality:**
+- Sequential tool calls with `await`
+- Parallel tool calls with `Promise.all()`
+- Tool discovery via search
+- Complex workflows with filtering
+- Error handling in JavaScript sandbox
+- Timeout enforcement (configurable)
+- Memory limit enforcement (64MB)
+- Tool exclusion (`codeMode: false`)
+- Dynamic tool invocation via `call_tool(name, params)`
+- Convenience wrappers via `external_<toolName>(args)`
+
+**✅ Transport Modes:**
+- stdio transport (JSON-RPC over stdin/stdout)
+- HTTP transport (JSON-RPC over HTTP POST)
+- Bidirectional communication
+- Proper MCP protocol implementation
+
+**✅ Data Operations:**
+- CRUD operations on Users and Todos
+- Many-to-many relationship management
+- Bidirectional reference maintenance
+- Automatic cleanup on deletion
+- JSON file persistence
+- Data seeding on first run
+
+**✅ Protocol Features:**
+- MCP initialization handshake
+- Tool listing via `tools/list`
+- Tool execution via `tools/call`
+- JSON-RPC 2.0 compliance
+- Error responses
+- Notifications support
+
+**✅ Generated Artifacts:**
+- MCP servers (stdio + HTTP)
+- Tool metadata (JSON)
+- OpenAPI 3.0 specifications
+- Complete Dart source code
+
+### Testing Approaches
+
+| Approach | Best For | Transport | Automation |
+|----------|----------|-----------|------------|
+| **MCP Inspector (Web UI)** | Interactive testing, exploring | stdio | Manual |
+| **MCP Inspector (CLI)** | Scripting, CI/CD | stdio | Automated |
+| **Bash Script** | HTTP validation | HTTP | Automated |
+| **Node.js Client** | Programmatic testing | HTTP | Automated |
+| **curl Commands** | Low-level validation | HTTP | Manual/Automated |
+| **stdio Pipes** | Protocol validation | stdio | Automated |
+
+### Documentation Files
+
+- **[README.md](README.md)** - This file, comprehensive overview
+- **[TESTING.md](TESTING.md)** - Complete testing guide with MCP Inspector setup, code mode examples, and troubleshooting
+
+### Quick Commands
+
+```bash
+# Launch interactive testing
+cd example
+./launch_inspector.sh
+
+# Run automated tests
+cd example
+./test_code_mode.sh
+node test_mcp_http.js
+
+# Regenerate servers
+cd ..
+dart run build_runner build --delete-conflicting-outputs
+
+# Run servers directly
+dart run example/bin/example.stdio.mcp.dart  # stdio
+dart run example/bin/example.mcp.dart         # HTTP
+```
+
+---
+
+**Ready to test?** Start with `./launch_inspector.sh` for the best interactive experience!

@@ -134,6 +134,68 @@ class Mcp {
   /// Defaults to false.
   final bool generateOpenApi;
 
+  /// Whether to enable code mode for this MCP server.
+  ///
+  /// When true, generates `search` and `execute` tools that allow LLMs
+  /// to discover and orchestrate multiple tool calls in a single JavaScript
+  /// program instead of making sequential round-trips. This reduces latency
+  /// (N round-trips → 1), reduces token usage, enables parallelism via
+  /// `Promise.all`, and allows complex logic (math, data transformations).
+  ///
+  /// The `search` tool lets LLMs discover available tools by name or
+  /// description without loading all tool schemas into context. It returns
+  /// matching tools at brief, detailed, or full detail levels.
+  ///
+  /// The `execute` tool spawns a sandboxed Node.js subprocess where all
+  /// code-mode-enabled tools are available as `external_*` async functions
+  /// and via the generic `call_tool(name, params)` function. The LLM
+  /// generates JavaScript code that calls these functions and returns a
+  /// structured result.
+  ///
+  /// Tools can be individually excluded from code mode by setting
+  /// `@Tool(codeMode: false)`, which removes them from the search
+  /// index and the sandbox environment.
+  ///
+  /// Code mode requires Node.js to be installed on the system.
+  ///
+  /// Example:
+  /// ```dart
+  /// @Mcp(transport: McpTransport.http, codeMode: true)
+  /// class UserService {
+  ///   @Tool(description: 'Create user')
+  ///   Future<User> createUser() async { ... }
+  /// }
+  /// ```
+  ///
+  /// Defaults to false.
+  final bool codeMode;
+
+  /// Maximum execution time in seconds for code mode scripts.
+  ///
+  /// Only used when [codeMode] is true. If a script exceeds this timeout,
+  /// the sandbox process is forcefully terminated and an error is returned.
+  ///
+  /// Defaults to 30 seconds.
+  final int codeModeTimeout;
+
+  /// Whether to log internal errors to stderr for troubleshooting.
+  ///
+  /// When true, generated tool handlers will write the full exception
+  /// message and stack trace to stderr before returning a generic error
+  /// to the MCP client. This helps developers diagnose issues (file I/O
+  /// errors, type mismatches, etc.) while keeping client-facing error
+  /// messages safe and generic.
+  ///
+  /// stderr output is visible in the MCP Inspector's "Error output from
+  /// MCP server" pane, in terminal output when running via `dart run`,
+  /// and in any client that captures the subprocess's stderr stream.
+  ///
+  /// When false (the default), no diagnostic output is produced,
+  /// keeping logs clean for production deployments.
+  ///
+  /// Defaults to false.
+  final bool logErrors;
+
   /// Creates an MCP configuration annotation.
   ///
   /// [transport] determines the communication protocol (stdio or HTTP).
@@ -143,6 +205,9 @@ class Mcp {
   /// [toolPrefix] adds a prefix to all tool names in this scope.
   /// [autoClassPrefix] automatically prefixes tool names with class name.
   /// [generateOpenApi] controls whether to generate OpenAPI specification.
+  /// [codeMode] enables the search and execute tools for tool orchestration.
+  /// [codeModeTimeout] sets the max execution time for code mode scripts.
+  /// [logErrors] controls whether internal errors are logged to stderr.
   const Mcp({
     this.transport = McpTransport.stdio,
     this.generateJson = false,
@@ -151,6 +216,9 @@ class Mcp {
     this.toolPrefix,
     this.autoClassPrefix = false,
     this.generateOpenApi = false,
+    this.codeMode = false,
+    this.codeModeTimeout = 30,
+    this.logErrors = false,
   });
 }
 
@@ -209,13 +277,75 @@ class Tool {
   @Deprecated('Will be implemented in future version')
   final Map<String, Object?>? execution;
 
+  /// Whether this tool should be available in code mode.
+  ///
+  /// Only meaningful when the parent [Mcp] annotation has `codeMode: true`.
+  /// When true (the default), this tool is:
+  /// - Listed in the `search` tool's results so LLMs can discover it
+  /// - Available as an async JavaScript function named `external_<toolName>`
+  ///   in the `execute` tool's sandbox
+  /// - Callable via the generic `call_tool(name, params)` function
+  ///
+  /// Set to false for tools that should not be available in code mode,
+  /// such as destructive operations that require explicit confirmation.
+  /// Tools with `codeMode: false` are excluded from the search index
+  /// and the sandbox environment entirely.
+  ///
+  /// Note: This controls *sandbox* availability, not whether the tool
+  /// appears in the standard `tools/list` response. See [codeModeVisible]
+  /// for tool list visibility.
+  ///
+  /// Example:
+  /// ```dart
+  /// @Tool(description: 'Delete a user', codeMode: false)
+  /// Future<bool> deleteUser(int id) async { ... }
+  /// ```
+  ///
+  /// Defaults to true.
+  final bool codeMode;
+
+  /// Whether this tool should remain visible in the standard `tools/list`
+  /// response when the parent [Mcp] annotation has `codeMode: true`.
+  ///
+  /// When [Mcp.codeMode] is true, the standard tool list is replaced by
+  /// just the `search` and `execute` tools so that LLMs orchestrate
+  /// everything through the JavaScript sandbox. Individual tools can
+  /// opt back in to the standard list by setting `codeModeVisible: true`.
+  ///
+  /// When [Mcp.codeMode] is false, this field has no effect — all tools
+  /// are always listed.
+  ///
+  /// This is independent of [codeMode]: a tool can be visible in the
+  /// standard list and also available inside the sandbox, or visible only
+  /// in one of the two surfaces.
+  ///
+  /// Example — expose a single tool directly alongside search/execute:
+  /// ```dart
+  /// @Tool(description: 'Ping the server', codeModeVisible: true)
+  /// String ping() => 'pong';
+  /// ```
+  ///
+  /// Defaults to false.
+  final bool codeModeVisible;
+
   /// Creates a Tool annotation.
   ///
   /// [name] - Optional custom tool name (defaults to method name).
   /// [description] - Human-readable description of the tool's purpose.
   /// [icons] - Optional list of icon URLs for visual identification.
   /// [execution] - Deprecated, will be implemented in a future version.
-  const Tool({this.name, this.description, this.icons, this.execution});
+  /// [codeMode] - Whether this tool is available in the code mode sandbox
+  ///   (default: true).
+  /// [codeModeVisible] - Whether this tool remains listed in `tools/list`
+  ///   when the parent `@Mcp` has `codeMode: true` (default: false).
+  const Tool({
+    this.name,
+    this.description,
+    this.icons,
+    this.execution,
+    this.codeMode = true,
+    this.codeModeVisible = false,
+  });
 }
 
 /// Annotation to provide rich metadata for individual parameters in a Tool.

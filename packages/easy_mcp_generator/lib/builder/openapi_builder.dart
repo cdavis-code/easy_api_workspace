@@ -121,7 +121,7 @@ class OpenApiBuilder {
     // Simple pluralization
     if (!result.endsWith('s')) {
       if (result.endsWith('y')) {
-        result = result.substring(0, result.length - 1) + 'ies';
+        result = '${result.substring(0, result.length - 1)}ies';
       } else {
         result += 's';
       }
@@ -179,10 +179,7 @@ class OpenApiBuilder {
       // GET /{resource}/{id} - Get by ID
       if (getTool != null) {
         paths[resourcePath] ??= <String, dynamic>{};
-        paths[resourcePath]['get'] = _buildGetOperation(
-          getTool,
-          resourceName,
-        );
+        paths[resourcePath]['get'] = _buildGetOperation(getTool, resourceName);
       }
 
       // PATCH /{resource}/{id} - Update
@@ -261,9 +258,7 @@ class OpenApiBuilder {
             },
           },
         },
-        '400': <String, dynamic>{
-          'description': 'Invalid request body',
-        },
+        '400': <String, dynamic>{'description': 'Invalid request body'},
       },
     };
   }
@@ -373,15 +368,11 @@ class OpenApiBuilder {
         },
       },
       'responses': <String, dynamic>{
-        '200': <String, dynamic>{
-          'description': 'Successfully updated',
-        },
+        '200': <String, dynamic>{'description': 'Successfully updated'},
         '404': <String, dynamic>{
           'description': '${_capitalize(singularResource)} not found',
         },
-        '400': <String, dynamic>{
-          'description': 'Invalid request',
-        },
+        '400': <String, dynamic>{'description': 'Invalid request'},
       },
     };
   }
@@ -407,9 +398,7 @@ class OpenApiBuilder {
         },
       ],
       'responses': <String, dynamic>{
-        '204': <String, dynamic>{
-          'description': 'Successfully deleted',
-        },
+        '204': <String, dynamic>{'description': 'Successfully deleted'},
         '404': <String, dynamic>{
           'description': '${_capitalize(singularResource)} not found',
         },
@@ -437,9 +426,7 @@ class OpenApiBuilder {
             'application/json': <String, dynamic>{
               'schema': <String, dynamic>{
                 'type': 'array',
-                'items': <String, dynamic>{
-                  'type': 'object',
-                },
+                'items': <String, dynamic>{'type': 'object'},
               },
             },
           },
@@ -478,22 +465,20 @@ class OpenApiBuilder {
   static List<Map<String, dynamic>> _buildQueryParameters(
     List<Map<String, dynamic>> params,
   ) {
-    return params
-        .map((param) {
-          final paramName = param['name'] as String;
-          final paramType = param['type'] as String;
-          final isOptional = param['isOptional'] == true;
-          final description = param['description'] as String?;
+    return params.map((param) {
+      final paramName = param['name'] as String;
+      final paramType = param['type'] as String;
+      final isOptional = param['isOptional'] == true;
+      final description = param['description'] as String?;
 
-          return <String, dynamic>{
-            'name': paramName,
-            'in': 'query',
-            'required': !isOptional,
-            'schema': _dartTypeToOpenApiSchema(paramType, param),
-            if (description != null) 'description': description,
-          };
-        })
-        .toList();
+      return <String, dynamic>{
+        'name': paramName,
+        'in': 'query',
+        'required': !isOptional,
+        'schema': _dartTypeToOpenApiSchema(paramType, param),
+        'description': ?description,
+      };
+    }).toList();
   }
 
   /// Converts Dart type to OpenAPI schema.
@@ -645,7 +630,7 @@ class OpenApiBuilder {
   /// Converts plural to singular.
   static String _singularize(String plural) {
     if (plural.endsWith('ies')) {
-      return plural.substring(0, plural.length - 3) + 'y';
+      return '${plural.substring(0, plural.length - 3)}y';
     }
     if (plural.endsWith('s') && !plural.endsWith('ss')) {
       return plural.substring(0, plural.length - 1);

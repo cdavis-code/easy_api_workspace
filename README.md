@@ -53,7 +53,7 @@ dart run build_runner build
 ### 4. Run the Server
 
 ```bash
-dart run lib/my_server.mcp.dart
+dart run bin/my_server.mcp.dart
 ```
 
 ## Annotations
@@ -91,9 +91,16 @@ Future<User> createUser(String name, String email) async { ... }
   description: 'Creates a new user',
 )
 Future<User> createUser(String name, String email) async { ... }
+
+// Disable code mode for destructive operations
+@Tool(
+  description: 'Delete a user',
+  codeMode: false,  // Not available in batch orchestration
+)
+Future<bool> deleteUser(int id) async { ... }
 ```
 
-If `description` is omitted, the function's doc comment is used. Use `name` to customize the tool name for avoiding collisions or better organization.
+If `description` is omitted, the function's doc comment is used. Use `name` to customize the tool name for avoiding collisions or better organization. Set `codeMode` to `false` for tools that should not be available in batch orchestration (e.g., destructive operations).
 
 ### `@Parameter` (Optional)
 
@@ -127,7 +134,35 @@ Future<User> createUser({
 }) async { ... }
 ```
 
+**Full `@Parameter` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | `String?` | Human-readable label displayed in MCP clients |
+| `description` | `String?` | Detailed description of the parameter |
+| `example` | `Object?` | Example value shown as a hint |
+| `minimum` | `num?` | Minimum value for numeric parameters |
+| `maximum` | `num?` | Maximum value for numeric parameters |
+| `pattern` | `String?` | Regex pattern for string validation |
+| `sensitive` | `bool` | Mark as sensitive (e.g., passwords, API keys). Default: `false` |
+| `enumValues` | `List<Object?>?` | Restrict to specific allowed values |
+
 **Note:** `@Parameter` is optional. By default, the generator extracts parameter information from Dart types and method signatures.
+
+### Code Mode
+
+Enable batch tool orchestration via sandboxed JavaScript execution. Reduces latency by replacing N sequential round-trips with a single call.
+
+```dart
+@Mcp(
+  codeMode: true,           // Enable the execute_code tool
+  codeModeTimeout: 60,      // Optional: max execution time (default: 30s)
+)
+```
+
+When enabled, an `execute_code` tool is generated that spawns a sandboxed Node.js subprocess where all code-mode-enabled tools are available as `external_*` async functions. The LLM can use `Promise.all()` for parallel calls and `await` for sequential logic.
+
+**Requirements:** Node.js must be installed on the system.
 
 ### OpenAPI Specification Generation
 
@@ -154,12 +189,16 @@ The generated spec follows Swagger API design best practices and can be used wit
 - **AST-based parsing** - Uses `dart:analyzer` for reliable code extraction
 - **Two transport modes** - stdio (JSON-RPC) and HTTP (Shelf-based)
 - **Configurable HTTP server** - Customize port and bind address
-- **Rich parameter metadata** - Optional `@Parameter` annotation for titles, descriptions, validation
+- **Rich parameter metadata** - Optional `@Parameter` annotation for titles, descriptions, validation, sensitive flags, and enum values
 - **Custom tool names** - Use `name` parameter on `@Tool`, `toolPrefix` or `autoClassPrefix` on `@Mcp` to avoid collisions
 - **Automatic schema generation** - Dart types mapped to JSON Schema
 - **Optional parameter support** - Named and optional positional parameters
 - **Doc comment extraction** - Falls back to doc comments when description not provided
+- **Code Mode** - Batch tool orchestration via sandboxed Node.js execution with `external_*` functions and `Promise.all` support
 - **OpenAPI 3.0 specification** - Auto-generate RESTful API documentation from MCP tools
+- **Tool icons** - Optional icon URLs for visual identification in MCP clients
+- **Many-to-many relationships** - Full example with User/Todo cross-store operations
+- **Generated metadata** - `.mcp.json` tool metadata and `.openapi.json` RPC-to-REST mapping
 
 ## Development
 

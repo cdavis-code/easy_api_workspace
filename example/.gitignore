@@ -1,1 +1,6 @@
 *.json
+
+bin/example.mcp.dart
+bin/example.stdio.mcp.dart
+
+build.yaml

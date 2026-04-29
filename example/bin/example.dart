@@ -9,6 +9,8 @@ import 'package:mcp_example/src/todo_store.dart';
   address: '0.0.0.0',
   generateJson: true,
   generateOpenApi: true,
+  codeMode: true,
+  logErrors: true,
 )
 Future<void> main() async {
   // Seed some initial data if the stores are empty

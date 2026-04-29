@@ -3,7 +3,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-
+import 'dart:io' as io;
 
 import 'package:dart_mcp/server.dart';
 import 'package:shelf/shelf.dart' as shelf;
@@ -68,6 +68,8 @@ Future<void> main() async {
 }
 
 base class MCPServerWithTools extends MCPServer with ToolsSupport {
+  static const bool _logErrors = true;
+
   MCPServerWithTools(super.channel)
     : super.fromStreamChannel(
         implementation: Implementation(
@@ -78,188 +80,37 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       ) {
     registerTool(
       Tool(
-        name: 'createUser',
-        description: 'Create a new user',
+        name: 'search',
+        description: 'Search for available tools by name or description. Returns matching tools with their parameter information. Use this to discover available tools before calling execute.',
         inputSchema: Schema.object(
-    properties: {
-      'name': Schema.string(
-      title: 'Full Name',
-      description: 'The user\'s full name (1-100 characters)'
-    ),
-      'email': Schema.string(
-      title: 'Email Address',
-      description: 'A valid email address for the user',
-      pattern: '^[\\w\\.-]+@[\\w\\.-]+\\.\\w+\$'
-    ),
-    },
-    required: ['name', 'email'],
-  ),
+          properties: {
+            'query': Schema.string(
+              description: 'Search terms. Space-separated terms are AND-matched against tool names and descriptions (case-insensitive).',
+            ),
+            'detail_level': UntitledSingleSelectEnumSchema(
+              description: 'Level of detail: "brief" (name + description), "detailed" (+ parameter names/types/required), "full" (+ complete parameter schemas).',
+              values: ['brief', 'detailed', 'full'],
+            ),
+          },
+          required: ['query'],
+        ),
       ),
-      _createUser,
+      _search,
     );
     registerTool(
       Tool(
-        name: 'getUserTodos',
-        description: 'Get all todos assigned to a user',
+        name: 'execute',
+        description: 'Execute JavaScript code with access to MCP tool functions. Use call_tool(name, params) to call any tool by name, or use external_<toolName>(args) convenience wrappers. Use the search tool first to discover available tools and their signatures. All calls are async - use await for sequential calls and Promise.all() for parallel calls. Return a value to include it in the result.',
         inputSchema: Schema.object(
-    properties: {
-      'userId': Schema.int(),
-    },
-    required: ['userId'],
-  ),
+          properties: {
+            'code': Schema.string(
+              description: 'JavaScript code to execute.',
+            ),
+          },
+          required: ['code'],
+        ),
       ),
-      _getUserTodos,
-    );
-    registerTool(
-      Tool(
-        name: 'getUser',
-        description: 'Get user by ID',
-        inputSchema: Schema.object(
-    properties: {
-      'id': Schema.int(),
-    },
-    required: ['id'],
-  ),
-      ),
-      _getUser,
-    );
-    registerTool(
-      Tool(
-        name: 'listUsers',
-        description: 'List all users',
-        inputSchema: Schema.object(),
-      ),
-      _listUsers,
-    );
-    registerTool(
-      Tool(
-        name: 'deleteUser',
-        description: 'Delete a user',
-        inputSchema: Schema.object(
-    properties: {
-      'id': Schema.int(),
-    },
-    required: ['id'],
-  ),
-      ),
-      _deleteUser,
-    );
-    registerTool(
-      Tool(
-        name: 'searchUsers',
-        description: 'Search users by query',
-        inputSchema: Schema.object(
-    properties: {
-      'query': Schema.string(
-      title: 'Search Query',
-      description: 'Text to search for in user names and emails'
-    ),
-    },
-    required: ['query'],
-  ),
-      ),
-      _searchUsers,
-    );
-    registerTool(
-      Tool(
-        name: 'createTodo',
-        description: 'Create a new todo',
-        inputSchema: Schema.object(
-    properties: {
-      'title': Schema.string(),
-    },
-    required: ['title'],
-  ),
-      ),
-      _createTodo,
-    );
-    registerTool(
-      Tool(
-        name: 'getTodo',
-        description: 'Get todo by ID',
-        inputSchema: Schema.object(
-    properties: {
-      'id': Schema.int(),
-    },
-    required: ['id'],
-  ),
-      ),
-      _getTodo,
-    );
-    registerTool(
-      Tool(
-        name: 'listTodos',
-        description: 'List all todos',
-        inputSchema: Schema.object(),
-      ),
-      _listTodos,
-    );
-    registerTool(
-      Tool(
-        name: 'deleteTodo',
-        description: 'Delete a todo',
-        inputSchema: Schema.object(
-    properties: {
-      'id': Schema.int(),
-    },
-    required: ['id'],
-  ),
-      ),
-      _deleteTodo,
-    );
-    registerTool(
-      Tool(
-        name: 'completeTodo',
-        description: 'Mark a todo as completed',
-        inputSchema: Schema.object(
-    properties: {
-      'id': Schema.int(),
-    },
-    required: ['id'],
-  ),
-      ),
-      _completeTodo,
-    );
-    registerTool(
-      Tool(
-        name: 'assignTodoToUser',
-        description: 'Assign a todo to a user',
-        inputSchema: Schema.object(
-    properties: {
-      'todoId': Schema.int(),
-      'userId': Schema.int(),
-    },
-    required: ['todoId', 'userId'],
-  ),
-      ),
-      _assignTodoToUser,
-    );
-    registerTool(
-      Tool(
-        name: 'removeTodoFromUser',
-        description: 'Remove a user from a todo',
-        inputSchema: Schema.object(
-    properties: {
-      'todoId': Schema.int(),
-      'userId': Schema.int(),
-    },
-    required: ['todoId', 'userId'],
-  ),
-      ),
-      _removeTodoFromUser,
-    );
-    registerTool(
-      Tool(
-        name: 'getTodosForUser',
-        description: 'Get all todos assigned to a user',
-        inputSchema: Schema.object(
-    properties: {
-      'userId': Schema.int(),
-    },
-    required: ['userId'],
-  ),
-      ),
-      _getTodosForUser,
+      _execute,
     );
   }
 
@@ -272,7 +123,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] createUser: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -287,7 +143,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] getUserTodos: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -302,7 +163,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] getUser: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -317,22 +183,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
-      return CallToolResult(
-        content: [TextContent(text: 'An error occurred while processing the request.')],
-        isError: true,
-      );
-    }
-  }
-  FutureOr<CallToolResult> _deleteUser(CallToolRequest request) async {
-    try {
-    final id = request.arguments!['id'] as int;
-
-      final result = await user_store.UserStore.deleteUser(id);
-      return CallToolResult(
-        content: [TextContent(text: _serializeResult(result))],
-      );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] listUsers: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -347,7 +203,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] searchUsers: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -362,7 +223,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] createTodo: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -377,7 +243,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] getTodo: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -392,7 +263,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] listTodos: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -407,7 +283,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] deleteTodo: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -422,7 +303,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] completeTodo: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -438,7 +324,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] assignTodoToUser: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -454,7 +345,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] removeTodoFromUser: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
@@ -469,12 +365,328 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
-    } catch (e) {
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] getTodosForUser: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
       return CallToolResult(
         content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
+  }
+  static const _codeModeToolSpecs = <Map<String, dynamic>>[<String, dynamic>{'name': 'createUser', 'description': 'Create a new user', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'name', 'type': 'string', 'required': true}, <String, dynamic>{'name': 'email', 'type': 'string', 'required': true}]}, <String, dynamic>{'name': 'getUserTodos', 'description': 'Get all todos assigned to a user', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'userId', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'getUser', 'description': 'Get user by ID', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'id', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'listUsers', 'description': 'List all users', 'parameters': <Map<String, dynamic>>[]}, <String, dynamic>{'name': 'searchUsers', 'description': 'Search users by query', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'query', 'type': 'string', 'required': true}]}, <String, dynamic>{'name': 'createTodo', 'description': 'Create a new todo', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'title', 'type': 'string', 'required': true}]}, <String, dynamic>{'name': 'getTodo', 'description': 'Get todo by ID', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'id', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'listTodos', 'description': 'List all todos', 'parameters': <Map<String, dynamic>>[]}, <String, dynamic>{'name': 'deleteTodo', 'description': 'Delete a todo', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'id', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'completeTodo', 'description': 'Mark a todo as completed', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'id', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'assignTodoToUser', 'description': 'Assign a todo to a user', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'todoId', 'type': 'number', 'required': true}, <String, dynamic>{'name': 'userId', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'removeTodoFromUser', 'description': 'Remove a user from a todo', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'todoId', 'type': 'number', 'required': true}, <String, dynamic>{'name': 'userId', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'getTodosForUser', 'description': 'Get all todos assigned to a user', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'userId', 'type': 'number', 'required': true}]}];
+  FutureOr<CallToolResult> _search(CallToolRequest request) async {
+    try {
+      final query = (request.arguments?['query'] as String?) ?? '';
+      final detailLevel = (request.arguments?['detail_level'] as String?) ?? 'brief';
+
+      final terms = query.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
+
+      if (terms.isEmpty) {
+        final results = _codeModeToolSpecs.map((tool) =>
+            _formatSearchResult(tool, detailLevel)).toList();
+        return CallToolResult(
+          content: [TextContent(text: jsonEncode(results))],
+        );
+      }
+
+      // Phase 1: strict AND match — all terms must appear in name or description
+      final andMatches = _codeModeToolSpecs.where((tool) {
+        final name = (tool['name'] as String).toLowerCase();
+        final desc = (tool['description'] as String).toLowerCase();
+        return terms.every((term) => name.contains(term) || desc.contains(term));
+      }).toList();
+
+      List<Map<String, dynamic>> matches;
+      if (andMatches.isNotEmpty) {
+        matches = andMatches;
+      } else {
+        // Phase 2: ranked OR match — score each tool by how many terms it matches
+        final scored = _codeModeToolSpecs.map((tool) {
+          final name = (tool['name'] as String).toLowerCase();
+          final desc = (tool['description'] as String).toLowerCase();
+          int score = 0;
+          for (final term in terms) {
+            if (name.contains(term) || desc.contains(term)) score++;
+          }
+          return MapEntry(tool, score);
+        }).where((e) => e.value > 0).toList();
+
+        scored.sort((a, b) => b.value.compareTo(a.value));
+        matches = scored.map((e) => e.key).toList();
+      }
+
+      final results = matches.map((tool) =>
+          _formatSearchResult(tool, detailLevel)).toList();
+
+      return CallToolResult(
+        content: [TextContent(text: jsonEncode(results))],
+      );
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] _search: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
+      return CallToolResult(
+        content: [TextContent(text: 'An error occurred while processing the request.')],
+        isError: true,
+      );
+    }
+  }
+
+  Map<String, dynamic> _formatSearchResult(
+    Map<String, dynamic> tool,
+    String detailLevel,
+  ) {
+    final name = tool['name'] as String;
+    final desc = tool['description'] as String;
+    final params = tool['parameters'] as List<Map<String, dynamic>>;
+
+    if (detailLevel == 'brief') {
+      return {'name': name, 'description': desc};
+    } else if (detailLevel == 'detailed') {
+      final paramInfo = params.map((p) => {
+        'name': p['name'],
+        'type': p['type'],
+        'required': p['required'],
+      }).toList();
+      return {'name': name, 'description': desc, 'parameters': paramInfo};
+    } else {
+      final paramInfo = params.map((p) {
+        final map = <String, dynamic>{
+          'name': p['name'],
+          'type': p['type'],
+          'required': p['required'],
+        };
+        return map;
+      }).toList();
+      return {'name': name, 'description': desc, 'parameters': paramInfo};
+    }
+  }
+  // ignore: prefer_adjacent_string_concatenation
+  
+  FutureOr<CallToolResult> _execute(CallToolRequest request) async {
+    try {
+      final code = request.arguments!['code'] as String;
+      final result = await _runCodeSandbox(code, 30);
+      return CallToolResult(
+        content: [TextContent(text: result ?? 'null')],
+      );
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_mcp] _execute: $e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
+      return CallToolResult(
+        content: [TextContent(text: 'An error occurred while processing the request.')],
+        isError: true,
+      );
+    }
+  }
+  Future<String?> _runCodeSandbox(String userCode, int timeoutSeconds) async {
+    io.Process? process;
+    io.Directory? tempDir;
+    try {
+      final wrapper = _buildJsWrapper(userCode);
+      tempDir = await io.Directory.systemTemp.createTemp('mcp_code_mode_');
+      final scriptFile = io.File('${tempDir.path}/sandbox.js');
+      await scriptFile.writeAsString(wrapper);
+
+      process = await io.Process.start(
+        'node',
+        ['--max-old-space-size=64', scriptFile.path],
+      );
+    } catch (e) {
+      await tempDir?.delete(recursive: true);
+      throw StateError('Code mode requires Node.js to be installed');
+    }
+
+    try {
+      final resultCompleter = Completer<String?>();
+      final errorCompleter = Completer<String>();
+
+      process.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen((line) {
+        if (line.trim().isEmpty) return;
+
+        try {
+          final msg = jsonDecode(line) as Map<String, dynamic>;
+          final type = msg['type'] as String?;
+
+          if (type == 'call') {
+            final callId = msg['callId'] as String;
+            final toolName = msg['tool'] as String;
+            final args = (msg['args'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+
+            _dispatchCodeModeToolCall(toolName, args).then((resultJson) {
+              process?.stdin.writeln(jsonEncode({
+                'type': 'result',
+                'callId': callId,
+                'data': resultJson,
+              }));
+            }).catchError((e, st) {
+              if (_logErrors) {
+                io.stderr.writeln('[easy_mcp] _dispatchCodeModeToolCall($toolName): $e');
+                io.stderr.writeln(st);
+                io.stderr.flush();  // fire-and-forget; callback is not async
+              }
+              process?.stdin.writeln(jsonEncode({
+                'type': 'result',
+                'callId': callId,
+                'data': null,
+                'error': 'An error occurred while processing the request.',
+              }));
+            });
+          } else if (type == 'done') {
+            final result = msg['result'];
+            if (result == null) {
+              resultCompleter.complete(null);
+            } else if (result is String) {
+              resultCompleter.complete(result);
+            } else {
+              resultCompleter.complete(jsonEncode(result));
+            }
+          } else if (type == 'error') {
+            errorCompleter.complete(msg['message'] as String? ?? 'Unknown error');
+          }
+        } catch (_) {
+          // Ignore non-JSON lines
+        }
+      });
+
+      // Wait for result, error, or timeout
+      final timeoutFuture = Future.delayed(
+        Duration(seconds: timeoutSeconds),
+        () => throw StateError('Code execution timed out after $timeoutSeconds seconds'),
+      );
+
+      final result = await Future.any<String?>([
+        resultCompleter.future,
+        errorCompleter.future.then((e) => throw StateError('Code execution error: $e')),
+        timeoutFuture,
+      ]);
+
+      return result;
+    } finally {
+      process.kill(io.ProcessSignal.sigkill);
+      await tempDir.delete(recursive: true);
+    }
+  }
+  String _buildJsWrapper(String userCode) {
+    final sb = StringBuffer();
+    sb.writeln('// Code Mode Sandbox - IPC Layer');
+    sb.writeln('const __pending = {};');
+    sb.writeln('let __callId = 0;');
+    sb.writeln("let __buffer = '';");
+    sb.writeln();
+    sb.writeln("process.stdin.on('data', (chunk) => {");
+    sb.writeln('  __buffer += chunk.toString();');
+    sb.writeln("  const lines = __buffer.split('\\n');");
+    sb.writeln('  __buffer = lines.pop();');
+    sb.writeln('  for (const line of lines) {');
+    sb.writeln("    if (!line.trim()) continue;");
+    sb.writeln('    try {');
+    sb.writeln('      const msg = JSON.parse(line);');
+    sb.writeln("      if (msg.type === 'result' && __pending[msg.callId]) {");
+    sb.writeln('        const { resolve, reject } = __pending[msg.callId];');
+    sb.writeln('        if (msg.error) { reject(new Error(msg.error)); }');
+    sb.writeln('        else { resolve(msg.data); }');
+    sb.writeln('        delete __pending[msg.callId];');
+    sb.writeln('      }');
+    sb.writeln('    } catch (e) {}');
+    sb.writeln('  }');
+    sb.writeln('});');
+    sb.writeln();
+    sb.writeln('function __send(msg) {');
+    sb.writeln("  process.stdout.write(JSON.stringify(msg) + '\\n');");
+    sb.writeln('}');
+    sb.writeln();
+    sb.writeln('async function __externalCall(tool, args) {');
+    sb.writeln('  const callId = String(++__callId);');
+    sb.writeln('  return new Promise((resolve, reject) => {');
+    sb.writeln('    __pending[callId] = { resolve, reject };');
+    sb.writeln("    __send({ type: 'call', callId, tool, args: args || {} });");
+    sb.writeln('  });');
+    sb.writeln('}');
+    sb.writeln();
+    sb.writeln('// Generic tool invocation function');
+    sb.writeln('async function call_tool(name, params) {');
+    sb.writeln('  return __externalCall(name, params || {});');
+    sb.writeln('}');
+    sb.writeln();
+    sb.writeln('// External Tool Functions (convenience wrappers)');
+    sb.writeln("async function external_createUser(args) { return call_tool('createUser', args); }");
+    sb.writeln("async function external_getUserTodos(args) { return call_tool('getUserTodos', args); }");
+    sb.writeln("async function external_getUser(args) { return call_tool('getUser', args); }");
+    sb.writeln("async function external_listUsers(args) { return call_tool('listUsers', args); }");
+    sb.writeln("async function external_searchUsers(args) { return call_tool('searchUsers', args); }");
+    sb.writeln("async function external_createTodo(args) { return call_tool('createTodo', args); }");
+    sb.writeln("async function external_getTodo(args) { return call_tool('getTodo', args); }");
+    sb.writeln("async function external_listTodos(args) { return call_tool('listTodos', args); }");
+    sb.writeln("async function external_deleteTodo(args) { return call_tool('deleteTodo', args); }");
+    sb.writeln("async function external_completeTodo(args) { return call_tool('completeTodo', args); }");
+    sb.writeln("async function external_assignTodoToUser(args) { return call_tool('assignTodoToUser', args); }");
+    sb.writeln("async function external_removeTodoFromUser(args) { return call_tool('removeTodoFromUser', args); }");
+    sb.writeln("async function external_getTodosForUser(args) { return call_tool('getTodosForUser', args); }");
+    sb.writeln();
+    sb.writeln('// Execute user code');
+    sb.writeln('(async () => {');
+    sb.writeln('  try {');
+    sb.writeln('    const __result = await (async () => {');
+    // Auto-return expression-like code (IIFE or bare await) so the LLM
+    // doesn't need to remember an explicit return for single-expression snippets.
+    final trimmedCode = userCode.trim();
+    final isExpressionLike = trimmedCode.startsWith('(') || trimmedCode.startsWith('await ');
+    final alreadyHasReturn = trimmedCode.startsWith('return ');
+    final codeToRun = (isExpressionLike && !alreadyHasReturn) ? 'return ' + userCode : userCode;
+    sb.writeln(codeToRun);
+    sb.writeln('    })();');
+    sb.writeln("    __send({ type: 'done', result: __result });");
+    sb.writeln('  } catch (e) {');
+    sb.writeln("    __send({ type: 'error', message: e.message || String(e) });");
+    sb.writeln('  }');
+    sb.writeln('})();');
+    return sb.toString();
+  }
+  dynamic _dispatchCodeModeToolCall(String toolName, Map<String, dynamic> args) async {
+    final request = CallToolRequest(name: toolName, arguments: args);
+    CallToolResult result;
+    switch (toolName) {
+      case 'search': result = await _search(request); break;
+      case 'createUser': result = await _createUser(request); break;
+      case 'getUserTodos': result = await _getUserTodos(request); break;
+      case 'getUser': result = await _getUser(request); break;
+      case 'listUsers': result = await _listUsers(request); break;
+      case 'searchUsers': result = await _searchUsers(request); break;
+      case 'createTodo': result = await _createTodo(request); break;
+      case 'getTodo': result = await _getTodo(request); break;
+      case 'listTodos': result = await _listTodos(request); break;
+      case 'deleteTodo': result = await _deleteTodo(request); break;
+      case 'completeTodo': result = await _completeTodo(request); break;
+      case 'assignTodoToUser': result = await _assignTodoToUser(request); break;
+      case 'removeTodoFromUser': result = await _removeTodoFromUser(request); break;
+      case 'getTodosForUser': result = await _getTodosForUser(request); break;
+      default:
+        throw StateError('Unknown tool: $toolName');
+    }
+
+    final textContent = result.content.whereType<TextContent>().firstOrNull;
+    if (textContent != null) {
+      final text = textContent.text;
+      try {
+        return jsonDecode(text);
+      } catch (_) {
+        return text;
+      }
+    }
+    return result.content.map((c) => c.toString()).join('\n');
   }
 
   String _serializeResult(dynamic result) {

@@ -1,6 +1,6 @@
 # easy_mcp_workspace Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-14
+Auto-generated from all feature plans. Last updated: 2026-04-28
 
 ## Active Technologies
 - Dart 3.11+ (null-safe)
@@ -23,7 +23,8 @@ packages/
 │   │   ├── builder/
 │   │   │   ├── mcp_builder.dart      # Main builder logic
 │   │   │   ├── schema_builder.dart   # Schema generation
-│   │   │   ├── templates.dart        # Code templates
+│   │   │   ├── templates.dart        # Code templates (stdio/HTTP/code mode)
+│   │   │   ├── openapi_builder.dart  # OpenAPI 3.0 spec generation
 │   │   │   └── doc_extractor.dart    # Doc comment extraction
 │   │   └── mcp_generator.dart
 │   ├── example/
@@ -36,10 +37,14 @@ example/                      # Working example
 │   └── todo.dart
 ├── bin/
 │   ├── example.dart
-│   └── example.mcp.dart      # Generated (do not edit)
+│   ├── example.mcp.dart      # Generated MCP server (do not edit)
+│   ├── example.mcp.json      # Generated MCP tool metadata
+│   └── example.openapi.json  # Generated OpenAPI 3.0 spec
 └── pubspec.yaml
-images/                       # Logo assets
-└── logo-banner.svg
+images/
+├── logo-banner.svg
+├── logo-icon.svg
+└── logo.svg
 ```
 
 ## Commands
@@ -87,10 +92,18 @@ Main server annotation with transport configuration:
 - `port`: HTTP port (default: 3000)
 - `address`: HTTP bind address (default: '127.0.0.1')
 - `generateJson`: Generate .mcp.json metadata (default: false)
+- `generateOpenApi`: Generate .openapi.json REST spec (default: false)
+- `codeMode`: Enable batch tool orchestration via Node.js sandbox (default: false)
+- `codeModeTimeout`: Max execution time for code mode scripts in seconds (default: 30)
+- `toolPrefix`: Prefix all tool names (optional)
+- `autoClassPrefix`: Prefix tool names with class name (default: false)
 
 ### @Tool
 Method annotation for exposing functions as MCP tools:
 - `description`: Tool description (optional, falls back to doc comments)
+- `name`: Custom tool name (optional, overrides method name)
+- `codeMode`: Available in code mode (default: true, set false for destructive ops)
+- `icons`: Optional icon URLs for visual identification
 
 ### @Parameter (Optional)
 Parameter annotation for rich metadata:
@@ -104,6 +117,7 @@ Note: @Parameter is optional - generator extracts info from Dart types by defaul
 
 - `.mcp.dart`: Complete MCP server implementation (stdio or HTTP)
 - `.mcp.json`: Tool metadata (only if `generateJson: true`)
+- `.openapi.json`: RESTful OpenAPI 3.0 specification (only if `generateOpenApi: true`)
 
 ## Publishing Checklist
 
@@ -123,11 +137,15 @@ Note: @Parameter is optional - generator extracts info from Dart types by defaul
 - Escape all special characters in generated strings
 
 ## Recent Changes
+- Added Code Mode with Node.js sandbox for batch tool orchestration (0.5.0)
+- Added OpenAPI 3.0 specification generation (0.5.0)
+- Added rich tool naming: custom names, class prefixes, tool prefixes (0.3.0)
 - Added @Parameter annotation for rich parameter metadata (0.2.0)
 - Added HTTP transport configuration (port, address)
+- Added multi-library tool aggregation
 - Made .mcp.json generation optional (generateJson parameter)
 - Fixed string escaping for regex patterns and special characters
-- Published easy_mcp_annotations 0.2.0 to pub.dev
+- Published easy_mcp_annotations 0.5.0 and easy_mcp_generator 0.5.0 to pub.dev
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

@@ -104,7 +104,7 @@ class UserStore {
 
   /// Deletes a user by their ID.
   /// Also removes the user reference from all todos.
-  @Tool(description: 'Delete a user')
+  @Tool(description: 'Delete a user', codeMode: false)
   static Future<bool> deleteUser(int id) async {
     final users = await _loadUsers();
     final initialLength = users.length;
