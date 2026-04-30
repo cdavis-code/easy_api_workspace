@@ -5,9 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.0] - Unreleased
+## [0.6.0] - 2026-04-30
 
 ### Added
+- Added canonical `lib/easy_api_generator.dart` entry point that re-exports `mcp_generator.dart`. Consumers can now use the conventional `import 'package:easy_api_generator/easy_api_generator.dart'` — the legacy `mcp_generator.dart` import still works.
 - REST template now honors `@Server(logErrors:)`, mirroring the MCP templates: detailed exceptions + stack traces go to `stderr` when `logErrors: true`, while the 500 response body stays generic. Previously the REST template silently swallowed caught exceptions, leaving operators with no diagnostic signal.
 - `@Parameter(sensitive: true)` is now actually emitted: `.mcp.json` inputSchema adds `"x-sensitive": true` on the property, `.openapi.json` adds `writeOnly: true`, and string-typed sensitive parameters also get `format: 'password'`. Previously the flag was extracted but never written anywhere.
 

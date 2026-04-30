@@ -1,7 +1,7 @@
 # easy_api_generator
 
 <p align="center">
-  <img src="../../images/logo-banner.svg" width="400" alt="easy_api">
+  <img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/images/logo-banner.svg" width="400" alt="easy_api">
 </p>
 
 Build Runner generator that creates MCP server code, REST API servers, and OpenAPI 3.0 specs from annotated Dart classes.
@@ -291,7 +291,7 @@ class MyServer { ... }
 
 ## Example
 
-See the [example](https://github.com/faithoflifedev/easy_api_workspace/tree/main/example) directory in the workspace root for a complete working example that demonstrates usage of both packages together.
+See the [example](https://github.com/cdavis-code/easy_api_workspace/tree/main/example) directory in the workspace root for a complete working example that demonstrates usage of both packages together.
 
 ## Generated Server Capabilities
 
@@ -302,7 +302,7 @@ The generated MCP server supports:
 
 ## Contributing
 
-Contributions are welcome! Please read the [CONTRIBUTING.md](https://github.com/faithoflifedev/easy_api_workspace/blob/main/CONTRIBUTING.md) guide at the root of the workspace for setup instructions, development workflow, coding standards, testing expectations, and the pull-request checklist before opening a PR.
+Contributions are welcome! Please read the [CONTRIBUTING.md](https://github.com/cdavis-code/easy_api_workspace/blob/main/CONTRIBUTING.md) guide at the root of the workspace for setup instructions, development workflow, coding standards, testing expectations, and the pull-request checklist before opening a PR.
 
 ## License
 
