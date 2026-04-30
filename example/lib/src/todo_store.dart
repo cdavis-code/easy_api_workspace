@@ -1,7 +1,7 @@
 // Persistent todo store backed by a JSON file.
 import 'dart:convert';
 import 'dart:io';
-import 'package:easy_mcp_annotations/mcp_annotations.dart';
+import 'package:easy_api_annotations/mcp_annotations.dart';
 import 'todo.dart';
 import 'user.dart';
 import 'user_store.dart';

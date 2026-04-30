@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - Unreleased
+
+### Changed
+- **Renamed `@Mcp` to `@Server`** — the primary annotation for defining server configuration
+- Renamed `generateOpenApi` parameter to `generateRest`
+- Added `generateMcp` parameter (default: true) to control .mcp.dart generation
+- Added `generateRest` parameter (default: false) to control .openapi.json generation
+
+### Deprecated
+- `@Mcp` typedef — still works but emits a deprecation warning. Use `@Server` instead.
+
 ## [0.5.0] - 2026-04-14
 
 ### Added
@@ -56,8 +67,8 @@ All notable changes to this project will be documented in this file.
 - `SchemaBuilder` for generating `dart_mcp` Schema expressions with metadata
 
 ### Changed
-- Renamed to `easy_mcp_annotations` and `easy_mcp_generator` packages
-- Published easy_mcp_annotations 0.2.0 to pub.dev
+- Renamed to `easy_api_annotations` and `easy_api_generator` packages
+- Published easy_api_annotations 0.2.0 to pub.dev
 
 ## [0.1.0] - 2026-04-12
 

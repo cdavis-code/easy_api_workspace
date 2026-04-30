@@ -1,0 +1,14 @@
+# Builder configuration for easy_api_generator
+builders:
+  mcpBuilder:
+    target: ":easy_api_generator"
+    import: "package:easy_api_generator/builder/mcp_builder.dart"
+    builder_factories: ["mcpBuilder"]
+    build_extensions:
+      .dart:
+        - .mcp.dart
+        - .mcp.json
+        - .openapi.dart
+        - .openapi.json
+    auto_apply: dependents
+    build_to: source

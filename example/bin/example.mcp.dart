@@ -197,7 +197,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
   }
   FutureOr<CallToolResult> _searchUsers(CallToolRequest request) async {
     try {
-    final query = request.arguments!['query'] as String;
+    final query = request.arguments!['q'] as String;
 
       final result = await user_store.UserStore.searchUsers(query);
       return CallToolResult(

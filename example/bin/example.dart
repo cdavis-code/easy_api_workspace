@@ -1,14 +1,15 @@
 // Example: Using mcp_annotations to expose library methods as MCP tools
-import 'package:easy_mcp_annotations/mcp_annotations.dart';
+import 'package:easy_api_annotations/mcp_annotations.dart';
 import 'package:mcp_example/src/user_store.dart';
 import 'package:mcp_example/src/todo_store.dart';
 
-@Mcp(
+@Server(
   transport: McpTransport.http,
   port: 8080,
   address: '0.0.0.0',
   generateJson: true,
-  generateOpenApi: true,
+  generateMcp: true,
+  generateRest: true,
   codeMode: true,
   logErrors: true,
 )

@@ -1,6 +1,6 @@
 # Testing with MCP Inspector
 
-This guide shows you how to test the easy_mcp code mode feature using the official [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) ([GitHub](https://github.com/modelcontextprotocol/inspector)).
+This guide shows you how to test the easy_api code mode feature using the official [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) ([GitHub](https://github.com/modelcontextprotocol/inspector)).
 
 **MCP Inspector** is an interactive developer tool for testing and debugging MCP servers. It provides a browser-based UI that lets you connect to a server, explore available tools and resources, execute tool calls, inspect request/response payloads, and monitor server notifications — all without writing any client code. It is the recommended way to validate that your MCP server behaves correctly before integrating it with production clients like Claude Desktop or Cursor.
 
@@ -9,6 +9,32 @@ This guide shows you how to test the easy_mcp code mode feature using the offici
 - **Dart SDK** (3.11+)
 - **Node.js** (for running MCP Inspector)
 - **Node.js** (also required for code mode sandbox execution)
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+  - [Step 1: Generate the Server](#step-1-generate-the-server)
+  - [Step 2: Launch MCP Inspector](#step-2-launch-mcp-inspector)
+- [Architecture](#architecture)
+- [Why stdio for Testing](#why-stdio-for-testing)
+- [Using MCP Inspector](#using-mcp-inspector)
+  - [1. Connect to the Server](#1-connect-to-the-server)
+  - [2. Explore Available Tools](#2-explore-available-tools)
+  - [3. Testing Tools Through `search` and `execute`](#3-testing-tools-through-search-and-execute)
+  - [4. Testing Code Mode](#4-testing-code-mode)
+  - [5. Code Mode Features](#5-code-mode-features)
+  - [6. Debug Output](#6-debug-output)
+  - [7. Security Notes](#7-security-notes)
+- [Testing REST API Servers](#testing-rest-api-servers)
+  - [Launching the REST API Server](#launching-the-rest-api-server)
+  - [Testing REST Endpoints](#testing-rest-endpoints)
+  - [Verifying REST Endpoints](#verifying-rest-endpoints)
+  - [MCP stdio vs REST API Testing](#mcp-stdio-vs-rest-api-testing)
+  - [REST API Testing Considerations](#rest-api-testing-considerations)
+  - [Quick REST API Test Script](#quick-rest-api-test-script)
+- [Troubleshooting](#troubleshooting)
+- [What to Test](#what-to-test)
+- [Next Steps](#next-steps)
 
 ## Quick Start
 
@@ -87,7 +113,7 @@ The server will start and you should see initialization information.
 
 ### 2. Explore Available Tools
 
-Navigate to the **Tools** tab. Because the example server is annotated with `@Mcp(codeMode: true)`, the standard `tools/list` response is replaced by just two orchestration tools:
+Navigate to the **Tools** tab. Because the example server is annotated with `@Server(codeMode: true)`, the standard `tools/list` response is replaced by just two orchestration tools:
 
 - **`search`** — Discover available tools by name or description without loading every tool schema into context. Supports `brief`, `detailed`, and `full` detail levels. Uses hybrid matching: strict AND first, then ranked OR fallback.
 - **`execute`** — Run JavaScript in a sandboxed Node.js subprocess that can invoke any code-mode-enabled tool via `call_tool(name, params)` or the generated `external_*` convenience wrappers.
@@ -237,10 +263,10 @@ The JavaScript sandbox provides:
 
 ### 6. Debug Output
 
-To see internal errors and stack traces, enable `logErrors` in the `@Mcp` annotation:
+To see internal errors and stack traces, enable `logErrors` in the `@Server` annotation:
 
 ```dart
-@Mcp(
+@Server(
   name: 'example-server',
   transport: McpTransport.stdio,
   codeMode: true,
@@ -250,19 +276,284 @@ To see internal errors and stack traces, enable `logErrors` in the `@Mcp` annota
 
 Then re-run `build_runner`. Errors will be written to stderr and appear in the MCP Inspector **Console** tab or your terminal.
 
+#### Example: Observing Errors with `logErrors: true`
+
+When `logErrors` is enabled, you'll see detailed error output in the terminal where the MCP server runs:
+
+**Terminal Output:**
+```
+[ERROR] 2024-01-15 10:30:45.123 - Error in tool 'getUser': User not found with id: 9999
+Stack trace:
+#0      UserStore.getUser (package:example/src/user_store.dart:45:7)
+#1      MCPTools.getUserHandler (bin/example.stdio.mcp.dart:123:22)
+#2      MCPServerWithTools._handleToolCall (package:easy_api_annotations/stubs.dart:89:14)
+```
+
+**MCP Inspector Console Tab:**
+The Console tab will display the same error messages, making it easier to debug issues without switching to your terminal. This is particularly useful when:
+
+- Debugging tool call failures
+- Tracking down unexpected null values
+- Investigating timeout errors in code mode
+- Understanding why a particular tool invocation failed
+
+**Example Error Scenario:**
+1. Enable `logErrors: true` in your `@Server` annotation
+2. Re-run `build_runner`
+3. In MCP Inspector, try calling `getUser` with a non-existent ID:
+   ```javascript
+   await external_getUser({ id: 9999 })
+   ```
+4. Check the Console tab or terminal for the detailed error output
+5. The error will include the stack trace, helping you pinpoint exactly where the issue occurred
+
 ### 7. Security Notes
 
 The code mode sandbox has built-in security:
 
 - 64MB memory limit for Node.js process
-- 30-second timeout (configurable via `@Mcp(codeModeTimeout: X)`)
+- 30-second timeout (configurable via `@Server(codeModeTimeout: X)`)
 - Blocked dangerous globals (`require`, `__dirname`, `__filename`, `process.exit()`)
 - Isolated temp directory (cleaned up after execution)
-- Standard tools are hidden from `tools/list` by default under `@Mcp(codeMode: true)`, forcing all orchestration through the auditable `search` + `execute` path.
+- Standard tools are hidden from `tools/list` by default under `@Server(codeMode: true)`, forcing all orchestration through the auditable `search` + `execute` path.
 
 Note: `deleteUser` has `@Tool(codeMode: false)` and no `codeModeVisible: true`, so it is intentionally absent from both the tools list and the sandbox. This prevents destructive operations from being invoked over MCP entirely.
 
+## Testing REST API Servers
+
+When `@Server(generateRest: true)` is set, the code generator produces a `.openapi.dart` file that implements a RESTful API server using the Shelf web framework. This section covers how to test and verify the generated REST endpoints.
+
+### Launching the REST API Server
+
+#### Step 1: Generate the REST Server
+
+If not already done, generate the REST server:
+
+```bash
+cd example
+dart run build_runner build --delete-conflicting-outputs
+```
+
+This produces `bin/example.openapi.dart` from your annotated source files.
+
+#### Step 2: Run the REST Server
+
+```bash
+cd example
+dart run bin/example.openapi.dart
+```
+
+The server will start on the configured address and port (default: `http://127.0.0.1:3000`). You should see output like:
+
+```
+REST API server running on http://127.0.0.1:3000
+```
+
+### Testing REST Endpoints
+
+#### Using curl
+
+**List all users:**
+```bash
+curl -X GET http://127.0.0.1:3000/users
+```
+
+**Create a new user:**
+```bash
+curl -X POST http://127.0.0.1:3000/users \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John Doe", "email": "john@example.com"}'
+```
+
+**Get a specific user:**
+```bash
+curl -X GET http://127.0.0.1:3000/users/1
+```
+
+**List all todos:**
+```bash
+curl -X GET http://127.0.0.1:3000/todos
+```
+
+**Create a new todo:**
+```bash
+curl -X POST http://127.0.0.1:3000/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Test REST API"}'
+```
+
+**Assign a todo to a user:**
+```bash
+curl -X POST http://127.0.0.1:3000/todos/1/assign/1
+```
+
+#### Using HTTPie (Alternative to curl)
+
+```bash
+# Install HTTPie
+brew install httpie  # macOS
+# or
+sudo apt install httpie  # Ubuntu/Debian
+
+# List users
+http GET http://127.0.0.1:3000/users
+
+# Create user
+http POST http://127.0.0.1:3000/users name="Jane Smith" email="jane@example.com"
+```
+
+#### Using a GUI HTTP Client
+
+You can also use tools like:
+- **Postman**: Import the generated `.openapi.json` spec to auto-generate collections
+- **Insomnia**: Similar to Postman, supports OpenAPI import
+- **Bruno**: Open-source alternative with OpenAPI support
+
+### Verifying REST Endpoints
+
+#### Check the OpenAPI Specification
+
+The generated `.openapi.json` file contains the full API specification. You can:
+
+1. **View it directly:**
+   ```bash
+   cat bin/example.openapi.json
+   ```
+
+2. **Use Swagger UI:**
+   - Go to https://swagger.io/tools/swagger-ui/
+   - Paste the contents of `example.openapi.json`
+   - Explore and test all endpoints interactively
+
+3. **Use Redoc:**
+   ```bash
+   # Install Redoc CLI
+   npm install -g @redocly/cli
+   
+   # Serve documentation
+   redocly preview-docs bin/example.openapi.json
+   ```
+
+#### Expected Response Format
+
+All responses follow standard REST conventions:
+
+- **Success (200/201):** Returns the requested resource(s) as JSON
+- **Not Found (404):** `{"error": "Resource not found"}`
+- **Bad Request (400):** `{"error": "Invalid request body"}`
+- **Server Error (500):** `{"error": "Internal server error"}` (generic message for security)
+
+### MCP stdio vs REST API Testing
+
+| Aspect | MCP stdio Server | REST API Server |
+|--------|------------------|-----------------|
+| **Transport** | stdin/stdout pipes | HTTP over TCP |
+| **Protocol** | JSON-RPC 2.0 | RESTful HTTP |
+| **Testing Tool** | MCP Inspector | curl, Postman, browser |
+| **Client Integration** | Claude Desktop, Cursor, custom MCP clients | Any HTTP client, web apps, mobile apps |
+| **State Management** | In-memory or file-based stores | Same stores, different access pattern |
+| **Authentication** | Not built-in (client-dependent) | Not built-in (add middleware as needed) |
+| **Best For** | AI agent workflows, tool orchestration | Traditional web/mobile APIs, third-party integrations |
+| **Documentation** | `tools/list` + `search` | OpenAPI 3.0 spec (`.openapi.json`) |
+
+### REST API Testing Considerations
+
+#### 1. Content-Type Headers
+
+Always include `Content-Type: application/json` for POST/PUT/PATCH requests:
+
+```bash
+# ❌ Will fail
+curl -X POST http://127.0.0.1:3000/users -d '{"name": "Test"}'
+
+# ✅ Correct
+curl -X POST http://127.0.0.1:3000/users \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Test"}'
+```
+
+#### 2. Path Parameters vs Query Parameters
+
+- **Path parameters** identify specific resources: `/users/123`
+- **Query parameters** filter or paginate: `/users?limit=10&offset=0`
+
+Check the generated code or OpenAPI spec to see which parameters are supported.
+
+#### 3. CORS (Cross-Origin Resource Sharing)
+
+If testing from a browser-based client, you may need to configure CORS headers. The generated server may not include CORS middleware by default. You can add it by modifying the generated file or creating a wrapper.
+
+#### 4. Error Handling
+
+Unlike MCP servers which return structured error objects, REST APIs use HTTP status codes:
+
+- Check the HTTP status code first
+- Parse the response body for error details
+- Implement retry logic for 5xx errors
+- Handle 4xx errors as client-side issues
+
+#### 5. Data Persistence
+
+Both MCP stdio and REST API servers use the same underlying data stores (e.g., `users.json`, `todos.json`). Testing one will affect the data visible to the other.
+
+### Quick REST API Test Script
+
+Save this as `test_rest_api.sh` for quick validation:
+
+```bash
+#!/bin/bash
+
+BASE_URL="http://127.0.0.1:3000"
+
+echo "=== Testing REST API ==="
+
+echo "\n1. Create user..."
+curl -s -X POST "$BASE_URL/users" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Test User", "email": "test@example.com"}'
+
+echo "\n\n2. List users..."
+curl -s -X GET "$BASE_URL/users"
+
+echo "\n\n3. Create todo..."
+curl -s -X POST "$BASE_URL/todos" \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Test Todo"}'
+
+echo "\n\n4. List todos..."
+curl -s -X GET "$BASE_URL/todos"
+
+echo "\n\n=== Tests Complete ==="
+```
+
+Make it executable and run:
+
+```bash
+chmod +x test_rest_api.sh
+./test_rest_api.sh
+```
+
 ## Troubleshooting
+
+### REST API server won't start
+- Ensure no other process is using the configured port (default: 3000)
+- Check the `@Server` annotation for correct `port` and `address` values
+- Verify Dart SDK version: `dart --version`
+- Regenerate the server: `dart run build_runner build --delete-conflicting-outputs`
+
+### Port already in use
+```bash
+# Find process using port 3000
+lsof -i :3000
+
+# Kill the process (replace PID)
+kill -9 <PID>
+```
+
+### REST API returns 404
+- Verify the endpoint path matches the generated routes
+- Check the OpenAPI spec for available endpoints
+- Ensure you're using the correct HTTP method (GET vs POST)
 
 ### Inspector won't connect
 - Ensure Node.js is installed: `node --version`
@@ -280,8 +571,8 @@ Note: `deleteUser` has `@Tool(codeMode: false)` and no `codeModeVisible: true`, 
 - Make sure you selected **stdio** transport (not HTTP)
 - Check the Console tab in Inspector for error messages
 - Verify the Dart server is running (look for "Seeding initial data..." message)
-- **Expected behavior under `@Mcp(codeMode: true)`:** only `search` and `execute` are listed. Standard tools (`listUsers`, `createTodo`, etc.) are hidden by design — call them through `execute`. To pin a specific tool back into `tools/list`, add `@Tool(codeModeVisible: true)` and rebuild.
-- If you expect every tool to appear in `tools/list`, disable code mode by removing `codeMode: true` from the `@Mcp(...)` annotation and re-running `build_runner`.
+- **Expected behavior under `@Server(codeMode: true)`:** only `search` and `execute` are listed. Standard tools (`listUsers`, `createTodo`, etc.) are hidden by design — call them through `execute`. To pin a specific tool back into `tools/list`, add `@Tool(codeModeVisible: true)` and rebuild.
+- If you expect every tool to appear in `tools/list`, disable code mode by removing `codeMode: true` from the `@Server(...)` annotation and re-running `build_runner`.
 
 ### Data persistence issues
 - Data is stored in `users.json` and `todos.json` in the example directory
@@ -317,10 +608,10 @@ After testing with MCP Inspector:
 1. Test with real MCP clients (Claude Desktop, Cursor, etc.)
 2. Integrate into your own MCP server projects
 3. Customize tool definitions with `@Tool` and `@Parameter` annotations
-4. Decide per tool whether to expose it in `tools/list` via `@Tool(codeModeVisible: true)` or keep it sandbox-only (the default under `@Mcp(codeMode: true)`)
+4. Decide per tool whether to expose it in `tools/list` via `@Tool(codeModeVisible: true)` or keep it sandbox-only (the default under `@Server(codeMode: true)`)
 5. Guard destructive operations with `@Tool(codeMode: false)` to remove them from both the sandbox and the tool list
-6. Adjust code mode timeout: `@Mcp(codeMode: true, codeModeTimeout: 60)`
-7. Enable debug logging: `@Mcp(codeMode: true, logErrors: true)`
+6. Adjust code mode timeout: `@Server(codeMode: true, codeModeTimeout: 60)`
+7. Enable debug logging: `@Server(codeMode: true, logErrors: true)`
 
 ---
 

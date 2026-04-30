@@ -1,4 +1,4 @@
-name: easy_mcp_workspace
+name: easy_api_workplace
 publish_to: none
 environment:
   sdk: ^3.9.0
@@ -6,8 +6,8 @@ dev_dependencies:
   lints: ^6.1.0
   melos: ^7.5.1
 workspace:
-  - packages/easy_mcp_annotations
-  - packages/easy_mcp_generator
+  - packages/easy_api_annotations
+  - packages/easy_api_generator
   - example
 melos:
   scripts:
@@ -17,6 +17,17 @@ melos:
     get: "melos exec -- dart pub get"
     upgrade: "melos exec -- dart pub upgrade"
     outdated: "melos exec -- dart pub outdated"
+
+    # Shared dependency strategy — keep versions aligned across all publishable
+    # packages. Run `deps:check` before every release and `deps:upgrade` when
+    # pana warns about outdated shared constraints (e.g. analyzer).
+    deps:check: "melos exec --no-private -- dart pub outdated --no-dev-dependencies"
+    deps:upgrade: "melos exec --no-private -- dart pub upgrade --major-versions"
+
+    # Pana quality review — only run on publishable packages, never on example.
+    pana: "melos exec --no-private -- pana --no-warning ."
+    pana:annotations: "cd packages/easy_api_annotations && pana ."
+    pana:generator: "cd packages/easy_api_generator && pana ."
 
     # Code quality
     analyze: "melos exec -- dart analyze . --fatal-infos"
@@ -43,14 +54,14 @@ melos:
       melos exec --no-private -- dart pub publish --dry-run &&
       echo "All packages ready for publishing"
     publish:annotations: >
-      cd packages/easy_mcp_annotations &&
+      cd packages/easy_api_annotations &&
       dart pub publish
     publish:generator: >
-      cd packages/easy_mcp_generator &&
+      cd packages/easy_api_generator &&
       dart pub publish
     publish:all: >
       melos run publish:annotations &&
-      echo "easy_mcp_annotations published. Update easy_mcp_generator dependency to ^0.1.2 and run:" &&
+      echo "easy_api_annotations published. Update easy_api_generator dependency to ^0.1.2 and run:" &&
       echo "melos run publish:generator"
 
     # Pre-commit / CI

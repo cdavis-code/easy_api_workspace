@@ -1,8 +1,8 @@
 #!/bin/bash
-# Launch MCP Inspector with the easy_mcp stdio server
+# Launch MCP Inspector with the easy_api stdio server
 # Usage: ./launch_inspector.sh
 
-echo "🔍 Launching MCP Inspector for easy_mcp code mode testing..."
+echo "🔍 Launching MCP Inspector for easy_api code mode testing..."
 echo ""
 
 # Check if Node.js is available

@@ -1,21 +1,114 @@
 <p align="center">
-  <img src="images/logo-banner.svg" width="600" alt="easy_mcp">
+  <img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/images/logo-banner.svg" width="600" alt="easy_api">
 </p>
 
 <p align="center">
-  <strong>A Dart code generator that transforms annotated functions into Model Context Protocol (MCP) servers.</strong>
+  <strong>A Dart code generator that transforms annotated functions into MCP servers and REST APIs.</strong>
 </p>
 
 ## Overview
 
-Easy MCP allows you to expose Dart library functions as MCP tools using simple annotations. The generator produces ready-to-run stdio or HTTP servers that comply with the MCP specification.
+Easy API allows you to expose Dart library functions as MCP tools and REST API endpoints using simple annotations. The generator produces ready-to-run stdio/HTTP MCP servers and/or REST API servers that comply with the MCP specification and OpenAPI 3.0 standard.
+
+### What You Can Build
+
+- **MCP Servers** - Create AI-powered tools callable by Claude Desktop, Cursor, and other MCP clients via stdio or HTTP transport
+- **REST APIs** - Generate traditional HTTP REST endpoints with full OpenAPI 3.0 documentation for web/mobile applications
+- **Hybrid Solutions** - Serve both AI agents and traditional HTTP clients from the same annotated Dart code
+- **Code Mode Orchestration** - Enable LLM-driven batch tool execution via sandboxed JavaScript for complex multi-step workflows
+
+### Uses of Generated `.openapi.json`
+
+The generated OpenAPI 3.0 specification file is a powerful artifact that enables:
+
+- **Interactive API Documentation** - Import into Swagger UI, Redoc, or Stoplight for browsable, interactive documentation
+- **Client SDK Generation** - Auto-generate type-safe client libraries in 50+ languages using OpenAPI Generator, Swagger Codegen, or NSwag
+- **API Testing & Mocking** - Create mock servers (Prism, WireMock) and automated tests without writing implementation code
+- **API Gateway Integration** - Configure Kong, AWS API Gateway, Apigee, or Azure API Management with ready-to-import specs
+- **Contract-First Development** - Share API contracts with frontend/mobile teams before implementation begins
+- **Automated Validation** - Validate requests/responses against the spec using tools like Dredd or Schemathesis
+- **Developer Portals** - Power documentation sites with ReadMe, Postman, or GitBook integrations
+- **Load Testing** - Generate realistic test scenarios with k6 or Apache JMeter from the spec
+
+### Generated Files and Artifacts
+
+The code generator can produce several different output files depending on your `@Server` configuration:
+
+| File | Generated When | Purpose |
+|------|---------------|---------|
+| `.mcp.dart` | `generateMcp: true` (default) | Complete MCP server implementation with stdio or HTTP transport. Contains all tool handlers, JSON-RPC routing, and server lifecycle management. **Do not edit manually** — regenerate via `build_runner`. |
+| `.mcp.json` | `generateJson: true` | MCP tool metadata file describing available tools, their parameters, and schemas. Used by MCP clients to discover and understand tool capabilities without connecting to the server. |
+| `.openapi.json` | `generateRest: true` | OpenAPI 3.0 specification for RESTful API endpoints. Includes resource-based URLs, request/response schemas, proper HTTP status codes, and can be used with Swagger UI, API gateways, or client code generators. |
+| `.openapi.dart` | `generateRest: true` | Complete REST API server implementation using the Shelf web framework. Serves the REST endpoints defined in the OpenAPI spec. Runs as a standard HTTP server on the configured port. |
+
+**Generation Flags on `@Server`:**
+
+```dart
+@Server(
+  transport: McpTransport.stdio,
+  generateMcp: true,      // Generate .mcp.dart server (default: true)
+  generateJson: false,    // Generate .mcp.json metadata (default: false)
+  generateRest: false,    // Generate .openapi.json + .openapi.dart (default: false)
+)
+```
+
+**Example Output Files:**
+
+```
+example/
+├── bin/
+│   ├── example.dart                    # Annotated source file (you write this)
+│   ├── example.mcp.dart                # Generated MCP server (stdio)
+│   ├── example.mcp.json                # Generated tool metadata (optional)
+│   ├── example.openapi.dart            # Generated REST API server (optional)
+│   └── example.openapi.json            # Generated OpenAPI 3.0 spec (optional)
+└── lib/src/
+    ├── user.dart                       # Domain models
+    ├── user_store.dart                 # Business logic
+    ├── todo.dart
+    └── todo_store.dart
+```
+
+**Use Cases:**
+
+- **MCP Server Only** (`generateMcp: true`): Build AI-powered applications that integrate with Claude Desktop, Cursor, or other MCP clients
+- **REST API Only** (`generateRest: true`): Create traditional HTTP APIs for web/mobile apps with full OpenAPI documentation
+- **Both MCP + REST** (`generateMcp: true, generateRest: true`): Serve both AI agents and traditional clients from the same annotated code
+- **Metadata Export** (`generateJson: true`): Share tool specifications with team members or use in CI/CD pipelines
+
+## Table of Contents
+
+- [Overview](#overview)
+  - [What You Can Build](#what-you-can-build)
+  - [Uses of Generated `.openapi.json`](#uses-of-generated-openapijson)
+  - [Generated Files and Artifacts](#generated-files-and-artifacts)
+- [Packages](#packages)
+- [Quick Start](#quick-start)
+  - [1. Add Dependencies](#1-add-dependencies)
+  - [2. Annotate Your Functions](#2-annotate-your-functions)
+  - [3. Run the Generator](#3-run-the-generator)
+  - [4. Run the Server](#4-run-the-server)
+- [Annotations](#annotations)
+  - [`@Server`](#server)
+  - [`@Tool`](#tool)
+  - [`@Parameter` (Optional)](#parameter-optional)
+  - [Code Mode](#code-mode)
+  - [REST API Specification Generation](#rest-api-specification-generation)
+- [Features](#features)
+- [Development](#development)
+  - [Prerequisites](#prerequisites)
+  - [AI Agent Skills](#ai-agent-skills)
+  - [Commands](#commands)
+- [Contributing](#contributing)
+- [License](#license)
+- [Support](#support)
 
 ## Packages
 
 | Package | Description | Version |
 |---------|-------------|---------|
-| [`easy_mcp_annotations`](packages/easy_mcp_annotations) | Annotation definitions (`@Mcp`, `@Tool`, `@Parameter`) | [![pub package](https://img.shields.io/pub/v/easy_mcp_annotations.svg)](https://pub.dev/packages/easy_mcp_annotations) |
-| [`easy_mcp_generator`](packages/easy_mcp_generator) | Build runner generator that produces MCP server code | [![pub package](https://img.shields.io/pub/v/easy_mcp_generator.svg)](https://pub.dev/packages/easy_mcp_generator) |
+| [`easy_api_annotations`](packages/easy_api_annotations) | Annotation definitions (`@Server`, `@Tool`, `@Parameter`) | [![pub package](https://img.shields.io/pub/v/easy_api_annotations.svg)](https://pub.dev/packages/easy_api_annotations) |
+| [`easy_api_generator`](packages/easy_api_generator) | Build runner generator that produces MCP server code | [![pub package](https://img.shields.io/pub/v/easy_api_generator.svg)](https://pub.dev/packages/easy_api_generator) |
 
 ## Quick Start
 
@@ -23,22 +116,49 @@ Easy MCP allows you to expose Dart library functions as MCP tools using simple a
 
 ```yaml
 dependencies:
-  easy_mcp_annotations: ^0.5.0
+  easy_api_annotations: ^0.5.0
 
 dev_dependencies:
   build_runner: ^2.4.0
-  easy_mcp_generator: ^0.5.0
+  easy_api_generator: ^0.5.0
 ```
 
 ### 2. Annotate Your Functions
 
 ```dart
-import 'package:easy_mcp_annotations/mcp_annotations.dart';
+import 'package:easy_api_annotations/mcp_annotations.dart';
 
-@Mcp(transport: McpTransport.stdio)
+@Server(transport: McpTransport.stdio)
 class UserServer {
   @Tool(description: 'Get user by ID')
-  Future<User> getUser(int id) async {
+  Future<User> getUser(
+    @Parameter(
+      title: 'User ID',
+      description: 'The unique identifier for the user',
+      example: 42,
+    )
+    int id,
+  ) async {
+    // ...
+  }
+  
+  @Tool(description: 'Create a new user')
+  Future<User> createUser({
+    @Parameter(
+      title: 'Name',
+      description: 'The user\'s full name',
+      example: 'Jane Doe',
+    )
+    required String name,
+    
+    @Parameter(
+      title: 'Email',
+      description: 'A valid email address',
+      example: 'jane@example.com',
+      pattern: r'^[\w\.-]+@[\w\.-]+\.\w+$',
+    )
+    required String email,
+  }) async {
     // ...
   }
 }
@@ -58,24 +178,28 @@ dart run bin/my_server.mcp.dart
 
 ## Annotations
 
-### `@Mcp`
+### `@Server`
 
 Controls the transport type and configuration for the generated server.
 
 ```dart
 // Stdio transport (default)
-@Mcp(transport: McpTransport.stdio)
+@Server(transport: McpTransport.stdio)
 
 // HTTP transport with custom port and address
-@Mcp(
+@Server(
   transport: McpTransport.http,
   port: 8080,                    // Default: 3000
   address: '0.0.0.0',            // Default: '127.0.0.1'
   generateJson: true,            // Optional: generate .mcp.json metadata
+  generateMcp: true,             // Default: true — generate .mcp.dart server
+  generateRest: false,           // Default: false — generate .openapi.json REST spec
   toolPrefix: 'user_service_',   // Optional: prefix all tool names
   autoClassPrefix: true,         // Optional: prefix with class name
 )
 ```
+
+> **Migration note:** `@Mcp` is still available as a deprecated typedef for backward compatibility. New code should use `@Server`.
 
 ### `@Tool`
 
@@ -154,25 +278,44 @@ Future<User> createUser({
 Enable batch tool orchestration via sandboxed JavaScript execution. Reduces latency by replacing N sequential round-trips with a single call.
 
 ```dart
-@Mcp(
-  codeMode: true,           // Enable the execute_code tool
+@Server(
+  codeMode: true,           // Enable the execute tool
   codeModeTimeout: 60,      // Optional: max execution time (default: 30s)
 )
 ```
 
-When enabled, an `execute_code` tool is generated that spawns a sandboxed Node.js subprocess where all code-mode-enabled tools are available as `external_*` async functions. The LLM can use `Promise.all()` for parallel calls and `await` for sequential logic.
+When enabled, an `execute` tool is generated that spawns a sandboxed Node.js subprocess where all code-mode-enabled tools are available as `external_*` async functions. The LLM can use `Promise.all()` for parallel calls and `await` for sequential logic.
+
+**Benefits of Code Mode:**
+
+- **Progressive Tool Discovery** - Instead of loading all tool definitions upfront (which can consume 100,000+ tokens), the agent discovers tools on-demand through the filesystem, reducing context usage by up to 98.7%
+- **Context-Efficient Data Processing** - Filter, aggregate, and transform large datasets in the execution environment before returning results. Process 10,000 rows but return only the 5 that matter
+- **Powerful Control Flow** - Use loops, conditionals, and error handling in code rather than chaining individual tool calls through the agent loop, saving both time and tokens
+- **Privacy-Preserving Operations** - Intermediate results stay in the execution environment by default. Sensitive data flows through your workflow without entering the model's context unless explicitly logged
+- **Parallel Execution** - Use `Promise.all()` to execute multiple independent tools simultaneously, dramatically reducing latency compared to sequential calls
+- **Reduced Token Costs** - By writing code instead of making sequential tool calls, agents avoid loading intermediate results into context multiple times, saving significant tokens on complex workflows
 
 **Requirements:** Node.js must be installed on the system.
 
-### OpenAPI Specification Generation
+> **Learn More:** Read Anthropic's comprehensive guide on [Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) to understand the efficiency gains and architectural patterns.
 
-Generate RESTful OpenAPI 3.0 specifications from your MCP tools:
+### REST API Specification Generation
+
+Generate RESTful OpenAPI 3.0 specifications and a ready-to-run REST server alongside your MCP tools by setting `generateRest: true` on the `@Server` annotation:
 
 ```dart
-@Mcp(
-  generateOpenApi: true,  // Enable OpenAPI generation
+@Server(
+  transport: McpTransport.http,
+  port: 8080,
+  generateRest: true,  // Enable OpenAPI spec + REST server generation
 )
-void configureMcp() { ... }
+class UserService {
+  @Tool(description: 'Get user by ID')
+  Future<User> getUser(int id) async { ... }
+  
+  @Tool(description: 'Create a new user')
+  Future<User> createUser(String name, String email) async { ... }
+}
 ```
 
 This generates a `.openapi.json` file with:
@@ -182,7 +325,7 @@ This generates a `.openapi.json` file with:
 - **Proper status codes** - 200, 201, 204, 400, 404 as appropriate
 - **Tags and operation IDs** - For API organization and client generation
 
-The generated spec follows Swagger API design best practices and can be used with Swagger UI, API gateways, and client code generation tools.
+A companion `.openapi.dart` file is also generated, providing a complete REST API server implementation built on the Shelf web framework. The generated spec follows Swagger API design best practices and can be used with Swagger UI, API gateways, and client code generation tools.
 
 ## Features
 
@@ -190,7 +333,7 @@ The generated spec follows Swagger API design best practices and can be used wit
 - **Two transport modes** - stdio (JSON-RPC) and HTTP (Shelf-based)
 - **Configurable HTTP server** - Customize port and bind address
 - **Rich parameter metadata** - Optional `@Parameter` annotation for titles, descriptions, validation, sensitive flags, and enum values
-- **Custom tool names** - Use `name` parameter on `@Tool`, `toolPrefix` or `autoClassPrefix` on `@Mcp` to avoid collisions
+- **Custom tool names** - Use `name` parameter on `@Tool`, `toolPrefix` or `autoClassPrefix` on `@Server` to avoid collisions
 - **Automatic schema generation** - Dart types mapped to JSON Schema
 - **Optional parameter support** - Named and optional positional parameters
 - **Doc comment extraction** - Falls back to doc comments when description not provided
@@ -206,6 +349,16 @@ The generated spec follows Swagger API design best practices and can be used wit
 
 - Dart SDK ^3.11.0
 - Melos (for workspace management)
+
+### AI Agent Skills
+
+This project includes specialized skills for AI agents to assist with annotation and code generation:
+
+- **Add Server Annotations Skill**: Located at `packages/easy_api_annotations/skills/easy_mcp_add-server-annotations/SKILL.md`
+  - Helps AI agents automatically add `@Server`, `@Tool`, and `@Parameter` annotations to existing Dart code
+  - Provides step-by-step workflow guidance for converting Dart libraries into MCP/REST servers
+  - Includes best practices, common patterns (CRUD, API wrappers, utilities), and troubleshooting tips
+  - **How to use**: Share this skill file with your AI assistant (Claude, Cursor, etc.) to guide it through the annotation process with expert-level knowledge of the Easy API framework
 
 ### Commands
 
@@ -225,6 +378,19 @@ melos run format
 # Rebuild generated code
 melos run build
 ```
+
+## Contributing
+
+Contributions are welcome! Whether you're reporting a bug, improving docs, or
+submitting a pull request, please read [CONTRIBUTING.md](CONTRIBUTING.md)
+first. It covers local setup, the Melos-based workflow, coding standards,
+testing, and the release process.
+
+Quick links:
+
+- [Open an issue](https://github.com/cdavis-code/easy_api_workplace/issues)
+- [Contribution guide](CONTRIBUTING.md)
+- [Development guidelines for agents](AGENTS.md)
 
 ## License
 

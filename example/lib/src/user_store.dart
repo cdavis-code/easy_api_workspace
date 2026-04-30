@@ -1,7 +1,7 @@
 // Persistent user store backed by a JSON file.
 import 'dart:convert';
 import 'dart:io';
-import 'package:easy_mcp_annotations/mcp_annotations.dart';
+import 'package:easy_api_annotations/mcp_annotations.dart';
 import 'user.dart';
 import 'todo.dart';
 import 'todo_store.dart';
@@ -138,6 +138,7 @@ class UserStore {
   @Tool(description: 'Search users by query')
   static Future<List<User>> searchUsers(
     @Parameter(
+      alias: 'q',
       title: 'Search Query',
       description: 'Text to search for in user names and emails',
       example: 'john',

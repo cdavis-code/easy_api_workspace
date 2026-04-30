@@ -1,5 +1,5 @@
 name: mcp_example
-description: Example usage of mcp_annotations and mcp_generator
+description: Example usage of easy_api_annotations and easy_api_generator
 version: 0.1.0
 publish_to: none
 
@@ -9,13 +9,13 @@ environment:
 resolution: workspace
 
 dependencies:
-  easy_mcp_annotations:
-    path: ../packages/easy_mcp_annotations
+  easy_api_annotations:
+    path: ../packages/easy_api_annotations
   dart_mcp: ^0.5.0
-  shelf: ^1.4.0
+  shelf_plus: ^1.11.0
   stream_channel: ^2.1.0
 
 dev_dependencies:
   build_runner: any
-  easy_mcp_generator:
-    path: ../packages/easy_mcp_generator
+  easy_api_generator:
+    path: ../packages/easy_api_generator

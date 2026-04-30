@@ -1,10 +1,10 @@
 # MCP Example
 
 <p align="center">
-  <img src="../images/logo-banner.svg" width="400" alt="easy_mcp">
+  <img src="../images/logo-banner.svg" width="400" alt="easy_api">
 </p>
 
-Example demonstrating how to use `easy_mcp_annotations` and `easy_mcp_generator`. This example showcases a realistic many-to-many domain model where **Users** and **Todos** have bidirectional relationships — a todo can be assigned to multiple users, and a user can have multiple todos.
+Example demonstrating how to use `easy_api_annotations` and `easy_api_generator`. This example showcases a realistic many-to-many domain model where **Users** and **Todos** have bidirectional relationships — a todo can be assigned to multiple users, and a user can have multiple todos.
 
 ## 📋 Table of Contents
 
@@ -20,7 +20,7 @@ Example demonstrating how to use `easy_mcp_annotations` and `easy_mcp_generator`
 
 ## Prerequisites
 
-This example is part of the `easy_mcp_workspace`. From the project root:
+This example is part of the `easy_api_workplace`. From the project root:
 
 ```bash
 dart pub get
@@ -35,15 +35,15 @@ dart pub get
 
 ### 1. Add annotations to your library
 
-Use `@Mcp` on your entry point and `@Tool` on static methods you want to expose as MCP tools:
+Use `@Server` on your entry point and `@Tool` on static methods you want to expose as MCP tools:
 
 ```dart
 // bin/example.dart
-import 'package:easy_mcp_annotations/mcp_annotations.dart';
+import 'package:easy_api_annotations/mcp_annotations.dart';
 import 'package:mcp_example/src/user_store.dart';
 import 'package:mcp_example/src/todo_store.dart';
 
-@Mcp(transport: McpTransport.stdio)
+@Server(transport: McpTransport.stdio)
 Future<void> main() async {
   // Your initialization code...
 }
@@ -54,7 +54,7 @@ Future<void> main() async {
 For HTTP transport, you can customize the port and bind address:
 
 ```dart
-@Mcp(
+@Server(
   transport: McpTransport.http,
   port: 8080,           // Default: 3000
   address: '0.0.0.0',   // Default: '127.0.0.1' (loopback)
@@ -178,7 +178,7 @@ This generates:
 - `bin/example.stdio.mcp.json` — Tool metadata for stdio version
 - `bin/example.stdio.openapi.json` — OpenAPI 3.0 spec for stdio version
 
-The generator discovers all `@Tool`-annotated methods from libraries imported by the `@Mcp`-annotated entry point and registers them in a single MCP server.
+The generator discovers all `@Tool`-annotated methods from libraries imported by the `@Server`-annotated entry point and registers them in a single MCP server.
 
 ### 3. Run the server
 
@@ -223,7 +223,7 @@ The generated MCP server exposes 14 tools organized by store:
 
 ## Annotations
 
-### `@Mcp`
+### `@Server`
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -295,7 +295,7 @@ Code Mode provides a Node.js sandbox where you can write JavaScript that:
 
 ### How It Works
 
-When `@Mcp(codeMode: true)` is enabled, the generated server includes:
+When `@Server(codeMode: true)` is enabled, the generated server includes:
 
 1. **`search` Tool** - Search across available tools by name or description
    - Parameters: `query` (required), `detail_level` (optional: 'brief', 'detailed', 'full')
@@ -714,11 +714,11 @@ This launches the interactive web UI at `http://localhost:6274` where you can:
 ```
 example/
 ├── bin/
-│   ├── example.dart                  # Entry point with @Mcp (HTTP transport)
+│   ├── example.dart                  # Entry point with @Server (HTTP transport)
 │   ├── example.mcp.dart              # Generated HTTP MCP server
 │   ├── example.mcp.json              # Tool metadata (HTTP)
 │   ├── example.openapi.json          # OpenAPI 3.0 spec (HTTP)
-│   ├── example.stdio.dart            # Entry point with @Mcp (stdio transport)
+│   ├── example.stdio.dart            # Entry point with @Server (stdio transport)
 │   ├── example.stdio.mcp.dart        # Generated stdio MCP server
 │   ├── example.stdio.mcp.json        # Tool metadata (stdio)
 │   └── example.stdio.openapi.json    # OpenAPI 3.0 spec (stdio)

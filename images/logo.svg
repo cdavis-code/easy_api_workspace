@@ -17,9 +17,9 @@
   <text x="100" y="95" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
         fill="white" text-anchor="middle">easy</text>
   
-  <!-- mcp text below -->
+  <!-- api text below -->
   <text x="100" y="125" font-family="Arial, sans-serif" font-size="32" font-weight="bold" 
-        fill="#13B9FD" text-anchor="middle">mcp</text>
+        fill="#13B9FD" text-anchor="middle">api</text>
   
   <!-- Tool/gear icon at bottom representing code generation -->
   <g transform="translate(100, 160)">

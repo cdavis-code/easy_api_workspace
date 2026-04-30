@@ -15,7 +15,7 @@
   <text x="50" y="48" font-family="Arial, sans-serif" font-size="14" font-weight="bold" 
         fill="white" text-anchor="middle">easy</text>
   
-  <!-- mcp text below -->
+  <!-- api text below -->
   <text x="50" y="64" font-family="Arial, sans-serif" font-size="16" font-weight="bold" 
-        fill="#13B9FD" text-anchor="middle">mcp</text>
+        fill="#13B9FD" text-anchor="middle">api</text>
 </svg>

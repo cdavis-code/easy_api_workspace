@@ -1,12 +1,12 @@
 import 'dart:io';
-import 'package:easy_mcp_annotations/mcp_annotations.dart';
+import 'package:easy_api_annotations/mcp_annotations.dart';
 import 'package:mcp_example/src/user_store.dart';
 import 'package:mcp_example/src/todo_store.dart';
 
-@Mcp(
+@Server(
   transport: McpTransport.stdio,
   // generateJson: true,
-  // generateOpenApi: true,
+  // generateRest: true,
   codeMode: true,
   logErrors: true,
 )

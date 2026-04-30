@@ -31,3 +31,5 @@ coverage/
 
 # Generated documentation
 doc/
+
+package_migration.md

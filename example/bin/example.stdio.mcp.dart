@@ -8,6 +8,7 @@ import 'dart:io' as io;
 import 'package:dart_mcp/server.dart';
 import 'package:dart_mcp/stdio.dart';
 
+
 import 'package:mcp_example/src/user_store.dart' as user_store;
 import 'package:mcp_example/src/todo_store.dart' as todo_store;
 
@@ -23,23 +24,23 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
 
   MCPServerWithTools(super.channel)
     : super.fromStreamChannel(
-        implementation: Implementation(name: 'mcp-server', version: '1.0.0'),
+        implementation: Implementation(
+          name: 'mcp-server',
+          version: '1.0.0',
+        ),
         instructions: 'Auto-generated MCP server',
       ) {
     registerTool(
       Tool(
         name: 'search',
-        description:
-            'Search for available tools by name or description. Returns matching tools with their parameter information. Use this to discover available tools before calling execute.',
+        description: 'Search for available tools by name or description. Returns matching tools with their parameter information. Use this to discover available tools before calling execute.',
         inputSchema: Schema.object(
           properties: {
             'query': Schema.string(
-              description:
-                  'Search terms. Space-separated terms are AND-matched against tool names and descriptions (case-insensitive).',
+              description: 'Search terms. Space-separated terms are AND-matched against tool names and descriptions (case-insensitive).',
             ),
             'detail_level': UntitledSingleSelectEnumSchema(
-              description:
-                  'Level of detail: "brief" (name + description), "detailed" (+ parameter names/types/required), "full" (+ complete parameter schemas).',
+              description: 'Level of detail: "brief" (name + description), "detailed" (+ parameter names/types/required), "full" (+ complete parameter schemas).',
               values: ['brief', 'detailed', 'full'],
             ),
           },
@@ -51,11 +52,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
     registerTool(
       Tool(
         name: 'execute',
-        description:
-            'Execute JavaScript code with access to MCP tool functions. Use call_tool(name, params) to call any tool by name, or use external_<toolName>(args) convenience wrappers. Use the search tool first to discover available tools and their signatures. All calls are async - use await for sequential calls and Promise.all() for parallel calls. Return a value to include it in the result.',
+        description: 'Execute JavaScript code with access to MCP tool functions. Use call_tool(name, params) to call any tool by name, or use external_<toolName>(args) convenience wrappers. Use the search tool first to discover available tools and their signatures. All calls are async - use await for sequential calls and Promise.all() for parallel calls. Return a value to include it in the result.',
         inputSchema: Schema.object(
           properties: {
-            'code': Schema.string(description: 'JavaScript code to execute.'),
+            'code': Schema.string(
+              description: 'JavaScript code to execute.',
+            ),
           },
           required: ['code'],
         ),
@@ -66,13 +68,10 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
 
   FutureOr<CallToolResult> _createUser(CallToolRequest request) async {
     try {
-      final name = request.arguments!['name'] as String;
-      final email = request.arguments!['email'] as String;
+    final name = request.arguments!['name'] as String;
+    final email = request.arguments!['email'] as String;
 
-      final result = await user_store.UserStore.createUser(
-        name: name,
-        email: email,
-      );
+      final result = await user_store.UserStore.createUser(name: name, email: email);
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
@@ -83,17 +82,14 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _getUserTodos(CallToolRequest request) async {
     try {
-      final userId = request.arguments!['userId'] as int;
+    final userId = request.arguments!['userId'] as int;
 
       final result = await user_store.UserStore.getUserTodos(userId);
       return CallToolResult(
@@ -106,17 +102,14 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _getUser(CallToolRequest request) async {
     try {
-      final id = request.arguments!['id'] as int;
+    final id = request.arguments!['id'] as int;
 
       final result = await user_store.UserStore.getUser(id);
       return CallToolResult(
@@ -129,16 +122,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _listUsers(CallToolRequest request) async {
     try {
+
+
       final result = await user_store.UserStore.listUsers();
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
@@ -150,17 +142,14 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _searchUsers(CallToolRequest request) async {
     try {
-      final query = request.arguments!['query'] as String;
+    final query = request.arguments!['q'] as String;
 
       final result = await user_store.UserStore.searchUsers(query);
       return CallToolResult(
@@ -173,17 +162,14 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _createTodo(CallToolRequest request) async {
     try {
-      final title = request.arguments!['title'] as String;
+    final title = request.arguments!['title'] as String;
 
       final result = await todo_store.TodoStore.createTodo(title: title);
       return CallToolResult(
@@ -196,17 +182,14 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _getTodo(CallToolRequest request) async {
     try {
-      final id = request.arguments!['id'] as int;
+    final id = request.arguments!['id'] as int;
 
       final result = await todo_store.TodoStore.getTodo(id);
       return CallToolResult(
@@ -219,16 +202,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _listTodos(CallToolRequest request) async {
     try {
+
+
       final result = await todo_store.TodoStore.listTodos();
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
@@ -240,17 +222,14 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _deleteTodo(CallToolRequest request) async {
     try {
-      final id = request.arguments!['id'] as int;
+    final id = request.arguments!['id'] as int;
 
       final result = await todo_store.TodoStore.deleteTodo(id);
       return CallToolResult(
@@ -263,17 +242,14 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _completeTodo(CallToolRequest request) async {
     try {
-      final id = request.arguments!['id'] as int;
+    final id = request.arguments!['id'] as int;
 
       final result = await todo_store.TodoStore.completeTodo(id);
       return CallToolResult(
@@ -286,23 +262,17 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _assignTodoToUser(CallToolRequest request) async {
     try {
-      final todoId = request.arguments!['todoId'] as int;
-      final userId = request.arguments!['userId'] as int;
+    final todoId = request.arguments!['todoId'] as int;
+    final userId = request.arguments!['userId'] as int;
 
-      final result = await todo_store.TodoStore.assignTodoToUser(
-        todoId: todoId,
-        userId: userId,
-      );
+      final result = await todo_store.TodoStore.assignTodoToUser(todoId: todoId, userId: userId);
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
@@ -313,23 +283,17 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _removeTodoFromUser(CallToolRequest request) async {
     try {
-      final todoId = request.arguments!['todoId'] as int;
-      final userId = request.arguments!['userId'] as int;
+    final todoId = request.arguments!['todoId'] as int;
+    final userId = request.arguments!['userId'] as int;
 
-      final result = await todo_store.TodoStore.removeTodoFromUser(
-        todoId: todoId,
-        userId: userId,
-      );
+      final result = await todo_store.TodoStore.removeTodoFromUser(todoId: todoId, userId: userId);
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
@@ -340,17 +304,14 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _getTodosForUser(CallToolRequest request) async {
     try {
-      final userId = request.arguments!['userId'] as int;
+    final userId = request.arguments!['userId'] as int;
 
       final result = await todo_store.TodoStore.getTodosForUser(userId);
       return CallToolResult(
@@ -363,122 +324,22 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
-  static const _codeModeToolSpecs = <Map<String, dynamic>>[
-    <String, dynamic>{
-      'name': 'createUser',
-      'description': 'Create a new user',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'name', 'type': 'string', 'required': true},
-        <String, dynamic>{'name': 'email', 'type': 'string', 'required': true},
-      ],
-    },
-    <String, dynamic>{
-      'name': 'getUserTodos',
-      'description': 'Get all todos assigned to a user',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'userId', 'type': 'number', 'required': true},
-      ],
-    },
-    <String, dynamic>{
-      'name': 'getUser',
-      'description': 'Get user by ID',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'id', 'type': 'number', 'required': true},
-      ],
-    },
-    <String, dynamic>{
-      'name': 'listUsers',
-      'description': 'List all users',
-      'parameters': <Map<String, dynamic>>[],
-    },
-    <String, dynamic>{
-      'name': 'searchUsers',
-      'description': 'Search users by query',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'query', 'type': 'string', 'required': true},
-      ],
-    },
-    <String, dynamic>{
-      'name': 'createTodo',
-      'description': 'Create a new todo',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'title', 'type': 'string', 'required': true},
-      ],
-    },
-    <String, dynamic>{
-      'name': 'getTodo',
-      'description': 'Get todo by ID',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'id', 'type': 'number', 'required': true},
-      ],
-    },
-    <String, dynamic>{
-      'name': 'listTodos',
-      'description': 'List all todos',
-      'parameters': <Map<String, dynamic>>[],
-    },
-    <String, dynamic>{
-      'name': 'deleteTodo',
-      'description': 'Delete a todo',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'id', 'type': 'number', 'required': true},
-      ],
-    },
-    <String, dynamic>{
-      'name': 'completeTodo',
-      'description': 'Mark a todo as completed',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'id', 'type': 'number', 'required': true},
-      ],
-    },
-    <String, dynamic>{
-      'name': 'assignTodoToUser',
-      'description': 'Assign a todo to a user',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'todoId', 'type': 'number', 'required': true},
-        <String, dynamic>{'name': 'userId', 'type': 'number', 'required': true},
-      ],
-    },
-    <String, dynamic>{
-      'name': 'removeTodoFromUser',
-      'description': 'Remove a user from a todo',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'todoId', 'type': 'number', 'required': true},
-        <String, dynamic>{'name': 'userId', 'type': 'number', 'required': true},
-      ],
-    },
-    <String, dynamic>{
-      'name': 'getTodosForUser',
-      'description': 'Get all todos assigned to a user',
-      'parameters': <Map<String, dynamic>>[
-        <String, dynamic>{'name': 'userId', 'type': 'number', 'required': true},
-      ],
-    },
-  ];
+  static const _codeModeToolSpecs = <Map<String, dynamic>>[<String, dynamic>{'name': 'createUser', 'description': 'Create a new user', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'name', 'type': 'string', 'required': true}, <String, dynamic>{'name': 'email', 'type': 'string', 'required': true}]}, <String, dynamic>{'name': 'getUserTodos', 'description': 'Get all todos assigned to a user', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'userId', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'getUser', 'description': 'Get user by ID', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'id', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'listUsers', 'description': 'List all users', 'parameters': <Map<String, dynamic>>[]}, <String, dynamic>{'name': 'searchUsers', 'description': 'Search users by query', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'query', 'type': 'string', 'required': true}]}, <String, dynamic>{'name': 'createTodo', 'description': 'Create a new todo', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'title', 'type': 'string', 'required': true}]}, <String, dynamic>{'name': 'getTodo', 'description': 'Get todo by ID', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'id', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'listTodos', 'description': 'List all todos', 'parameters': <Map<String, dynamic>>[]}, <String, dynamic>{'name': 'deleteTodo', 'description': 'Delete a todo', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'id', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'completeTodo', 'description': 'Mark a todo as completed', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'id', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'assignTodoToUser', 'description': 'Assign a todo to a user', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'todoId', 'type': 'number', 'required': true}, <String, dynamic>{'name': 'userId', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'removeTodoFromUser', 'description': 'Remove a user from a todo', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'todoId', 'type': 'number', 'required': true}, <String, dynamic>{'name': 'userId', 'type': 'number', 'required': true}]}, <String, dynamic>{'name': 'getTodosForUser', 'description': 'Get all todos assigned to a user', 'parameters': <Map<String, dynamic>>[<String, dynamic>{'name': 'userId', 'type': 'number', 'required': true}]}];
   FutureOr<CallToolResult> _search(CallToolRequest request) async {
     try {
       final query = (request.arguments?['query'] as String?) ?? '';
-      final detailLevel =
-          (request.arguments?['detail_level'] as String?) ?? 'brief';
+      final detailLevel = (request.arguments?['detail_level'] as String?) ?? 'brief';
 
-      final terms = query
-          .toLowerCase()
-          .split(' ')
-          .where((t) => t.isNotEmpty)
-          .toList();
+      final terms = query.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
 
       if (terms.isEmpty) {
-        final results = _codeModeToolSpecs
-            .map((tool) => _formatSearchResult(tool, detailLevel))
-            .toList();
+        final results = _codeModeToolSpecs.map((tool) =>
+            _formatSearchResult(tool, detailLevel)).toList();
         return CallToolResult(
           content: [TextContent(text: jsonEncode(results))],
         );
@@ -488,9 +349,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       final andMatches = _codeModeToolSpecs.where((tool) {
         final name = (tool['name'] as String).toLowerCase();
         final desc = (tool['description'] as String).toLowerCase();
-        return terms.every(
-          (term) => name.contains(term) || desc.contains(term),
-        );
+        return terms.every((term) => name.contains(term) || desc.contains(term));
       }).toList();
 
       List<Map<String, dynamic>> matches;
@@ -498,28 +357,26 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         matches = andMatches;
       } else {
         // Phase 2: ranked OR match — score each tool by how many terms it matches
-        final scored = _codeModeToolSpecs
-            .map((tool) {
-              final name = (tool['name'] as String).toLowerCase();
-              final desc = (tool['description'] as String).toLowerCase();
-              int score = 0;
-              for (final term in terms) {
-                if (name.contains(term) || desc.contains(term)) score++;
-              }
-              return MapEntry(tool, score);
-            })
-            .where((e) => e.value > 0)
-            .toList();
+        final scored = _codeModeToolSpecs.map((tool) {
+          final name = (tool['name'] as String).toLowerCase();
+          final desc = (tool['description'] as String).toLowerCase();
+          int score = 0;
+          for (final term in terms) {
+            if (name.contains(term) || desc.contains(term)) score++;
+          }
+          return MapEntry(tool, score);
+        }).where((e) => e.value > 0).toList();
 
         scored.sort((a, b) => b.value.compareTo(a.value));
         matches = scored.map((e) => e.key).toList();
       }
 
-      final results = matches
-          .map((tool) => _formatSearchResult(tool, detailLevel))
-          .toList();
+      final results = matches.map((tool) =>
+          _formatSearchResult(tool, detailLevel)).toList();
 
-      return CallToolResult(content: [TextContent(text: jsonEncode(results))]);
+      return CallToolResult(
+        content: [TextContent(text: jsonEncode(results))],
+      );
     } catch (e, st) {
       if (_logErrors) {
         io.stderr.writeln('[easy_mcp] _search: $e');
@@ -527,9 +384,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
@@ -546,15 +401,11 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
     if (detailLevel == 'brief') {
       return {'name': name, 'description': desc};
     } else if (detailLevel == 'detailed') {
-      final paramInfo = params
-          .map(
-            (p) => {
-              'name': p['name'],
-              'type': p['type'],
-              'required': p['required'],
-            },
-          )
-          .toList();
+      final paramInfo = params.map((p) => {
+        'name': p['name'],
+        'type': p['type'],
+        'required': p['required'],
+      }).toList();
       return {'name': name, 'description': desc, 'parameters': paramInfo};
     } else {
       final paramInfo = params.map((p) {
@@ -569,12 +420,14 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
     }
   }
   // ignore: prefer_adjacent_string_concatenation
-
+  
   FutureOr<CallToolResult> _execute(CallToolRequest request) async {
     try {
       final code = request.arguments!['code'] as String;
       final result = await _runCodeSandbox(code, 30);
-      return CallToolResult(content: [TextContent(text: result ?? 'null')]);
+      return CallToolResult(
+        content: [TextContent(text: result ?? 'null')],
+      );
     } catch (e, st) {
       if (_logErrors) {
         io.stderr.writeln('[easy_mcp] _execute: $e');
@@ -582,14 +435,11 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   Future<String?> _runCodeSandbox(String userCode, int timeoutSeconds) async {
     io.Process? process;
     io.Directory? tempDir;
@@ -599,10 +449,10 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       final scriptFile = io.File('${tempDir.path}/sandbox.js');
       await scriptFile.writeAsString(wrapper);
 
-      process = await io.Process.start('node', [
-        '--max-old-space-size=64',
-        scriptFile.path,
-      ]);
+      process = await io.Process.start(
+        'node',
+        ['--max-old-space-size=64', scriptFile.path],
+      );
     } catch (e) {
       await tempDir?.delete(recursive: true);
       throw StateError('Code mode requires Node.js to be installed');
@@ -616,80 +466,62 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
           .transform(utf8.decoder)
           .transform(const LineSplitter())
           .listen((line) {
-            if (line.trim().isEmpty) return;
+        if (line.trim().isEmpty) return;
 
-            try {
-              final msg = jsonDecode(line) as Map<String, dynamic>;
-              final type = msg['type'] as String?;
+        try {
+          final msg = jsonDecode(line) as Map<String, dynamic>;
+          final type = msg['type'] as String?;
 
-              if (type == 'call') {
-                final callId = msg['callId'] as String;
-                final toolName = msg['tool'] as String;
-                final args =
-                    (msg['args'] as Map<String, dynamic>?) ??
-                    <String, dynamic>{};
+          if (type == 'call') {
+            final callId = msg['callId'] as String;
+            final toolName = msg['tool'] as String;
+            final args = (msg['args'] as Map<String, dynamic>?) ?? <String, dynamic>{};
 
-                _dispatchCodeModeToolCall(toolName, args)
-                    .then((resultJson) {
-                      process?.stdin.writeln(
-                        jsonEncode({
-                          'type': 'result',
-                          'callId': callId,
-                          'data': resultJson,
-                        }),
-                      );
-                    })
-                    .catchError((e, st) {
-                      if (_logErrors) {
-                        io.stderr.writeln(
-                          '[easy_mcp] _dispatchCodeModeToolCall($toolName): $e',
-                        );
-                        io.stderr.writeln(st);
-                        io.stderr
-                            .flush(); // fire-and-forget; callback is not async
-                      }
-                      process?.stdin.writeln(
-                        jsonEncode({
-                          'type': 'result',
-                          'callId': callId,
-                          'data': null,
-                          'error':
-                              'An error occurred while processing the request.',
-                        }),
-                      );
-                    });
-              } else if (type == 'done') {
-                final result = msg['result'];
-                if (result == null) {
-                  resultCompleter.complete(null);
-                } else if (result is String) {
-                  resultCompleter.complete(result);
-                } else {
-                  resultCompleter.complete(jsonEncode(result));
-                }
-              } else if (type == 'error') {
-                errorCompleter.complete(
-                  msg['message'] as String? ?? 'Unknown error',
-                );
+            _dispatchCodeModeToolCall(toolName, args).then((resultJson) {
+              process?.stdin.writeln(jsonEncode({
+                'type': 'result',
+                'callId': callId,
+                'data': resultJson,
+              }));
+            }).catchError((e, st) {
+              if (_logErrors) {
+                io.stderr.writeln('[easy_mcp] _dispatchCodeModeToolCall($toolName): $e');
+                io.stderr.writeln(st);
+                io.stderr.flush();  // fire-and-forget; callback is not async
               }
-            } catch (_) {
-              // Ignore non-JSON lines
+              process?.stdin.writeln(jsonEncode({
+                'type': 'result',
+                'callId': callId,
+                'data': null,
+                'error': 'An error occurred while processing the request.',
+              }));
+            });
+          } else if (type == 'done') {
+            final result = msg['result'];
+            if (result == null) {
+              resultCompleter.complete(null);
+            } else if (result is String) {
+              resultCompleter.complete(result);
+            } else {
+              resultCompleter.complete(jsonEncode(result));
             }
-          });
+          } else if (type == 'error') {
+            errorCompleter.complete(msg['message'] as String? ?? 'Unknown error');
+          }
+        } catch (_) {
+          // Ignore non-JSON lines
+        }
+      });
 
       // Wait for result, error, or timeout
       final timeoutFuture = Future.delayed(
         Duration(seconds: timeoutSeconds),
-        () => throw StateError(
-          'Code execution timed out after $timeoutSeconds seconds',
-        ),
+        () => throw StateError('Code execution timed out after $timeoutSeconds seconds'),
       );
 
       final result = await Future.any<String?>([
         resultCompleter.future,
-        errorCompleter.future.then(
-          (e) => throw StateError('Code execution error: $e'),
-        ),
+        errorCompleter.future.then((e) => throw StateError('Code execution error: $e')),
         timeoutFuture,
       ]);
 
@@ -699,7 +531,6 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       await tempDir.delete(recursive: true);
     }
   }
-
   String _buildJsWrapper(String userCode) {
     final sb = StringBuffer();
     sb.writeln('// Code Mode Sandbox - IPC Layer');
@@ -743,45 +574,19 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
     sb.writeln('}');
     sb.writeln();
     sb.writeln('// External Tool Functions (convenience wrappers)');
-    sb.writeln(
-      "async function external_createUser(args) { return call_tool('createUser', args); }",
-    );
-    sb.writeln(
-      "async function external_getUserTodos(args) { return call_tool('getUserTodos', args); }",
-    );
-    sb.writeln(
-      "async function external_getUser(args) { return call_tool('getUser', args); }",
-    );
-    sb.writeln(
-      "async function external_listUsers(args) { return call_tool('listUsers', args); }",
-    );
-    sb.writeln(
-      "async function external_searchUsers(args) { return call_tool('searchUsers', args); }",
-    );
-    sb.writeln(
-      "async function external_createTodo(args) { return call_tool('createTodo', args); }",
-    );
-    sb.writeln(
-      "async function external_getTodo(args) { return call_tool('getTodo', args); }",
-    );
-    sb.writeln(
-      "async function external_listTodos(args) { return call_tool('listTodos', args); }",
-    );
-    sb.writeln(
-      "async function external_deleteTodo(args) { return call_tool('deleteTodo', args); }",
-    );
-    sb.writeln(
-      "async function external_completeTodo(args) { return call_tool('completeTodo', args); }",
-    );
-    sb.writeln(
-      "async function external_assignTodoToUser(args) { return call_tool('assignTodoToUser', args); }",
-    );
-    sb.writeln(
-      "async function external_removeTodoFromUser(args) { return call_tool('removeTodoFromUser', args); }",
-    );
-    sb.writeln(
-      "async function external_getTodosForUser(args) { return call_tool('getTodosForUser', args); }",
-    );
+    sb.writeln("async function external_createUser(args) { return call_tool('createUser', args); }");
+    sb.writeln("async function external_getUserTodos(args) { return call_tool('getUserTodos', args); }");
+    sb.writeln("async function external_getUser(args) { return call_tool('getUser', args); }");
+    sb.writeln("async function external_listUsers(args) { return call_tool('listUsers', args); }");
+    sb.writeln("async function external_searchUsers(args) { return call_tool('searchUsers', args); }");
+    sb.writeln("async function external_createTodo(args) { return call_tool('createTodo', args); }");
+    sb.writeln("async function external_getTodo(args) { return call_tool('getTodo', args); }");
+    sb.writeln("async function external_listTodos(args) { return call_tool('listTodos', args); }");
+    sb.writeln("async function external_deleteTodo(args) { return call_tool('deleteTodo', args); }");
+    sb.writeln("async function external_completeTodo(args) { return call_tool('completeTodo', args); }");
+    sb.writeln("async function external_assignTodoToUser(args) { return call_tool('assignTodoToUser', args); }");
+    sb.writeln("async function external_removeTodoFromUser(args) { return call_tool('removeTodoFromUser', args); }");
+    sb.writeln("async function external_getTodosForUser(args) { return call_tool('getTodosForUser', args); }");
     sb.writeln();
     sb.writeln('// Execute user code');
     sb.writeln('(async () => {');
@@ -790,73 +595,36 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
     // Auto-return expression-like code (IIFE or bare await) so the LLM
     // doesn't need to remember an explicit return for single-expression snippets.
     final trimmedCode = userCode.trim();
-    final isExpressionLike =
-        trimmedCode.startsWith('(') || trimmedCode.startsWith('await ');
+    final isExpressionLike = trimmedCode.startsWith('(') || trimmedCode.startsWith('await ');
     final alreadyHasReturn = trimmedCode.startsWith('return ');
-    final codeToRun = (isExpressionLike && !alreadyHasReturn)
-        ? 'return ' + userCode
-        : userCode;
+    final codeToRun = (isExpressionLike && !alreadyHasReturn) ? 'return ' + userCode : userCode;
     sb.writeln(codeToRun);
     sb.writeln('    })();');
     sb.writeln("    __send({ type: 'done', result: __result });");
     sb.writeln('  } catch (e) {');
-    sb.writeln(
-      "    __send({ type: 'error', message: e.message || String(e) });",
-    );
+    sb.writeln("    __send({ type: 'error', message: e.message || String(e) });");
     sb.writeln('  }');
     sb.writeln('})();');
     return sb.toString();
   }
-
-  dynamic _dispatchCodeModeToolCall(
-    String toolName,
-    Map<String, dynamic> args,
-  ) async {
+  dynamic _dispatchCodeModeToolCall(String toolName, Map<String, dynamic> args) async {
     final request = CallToolRequest(name: toolName, arguments: args);
     CallToolResult result;
     switch (toolName) {
-      case 'search':
-        result = await _search(request);
-        break;
-      case 'createUser':
-        result = await _createUser(request);
-        break;
-      case 'getUserTodos':
-        result = await _getUserTodos(request);
-        break;
-      case 'getUser':
-        result = await _getUser(request);
-        break;
-      case 'listUsers':
-        result = await _listUsers(request);
-        break;
-      case 'searchUsers':
-        result = await _searchUsers(request);
-        break;
-      case 'createTodo':
-        result = await _createTodo(request);
-        break;
-      case 'getTodo':
-        result = await _getTodo(request);
-        break;
-      case 'listTodos':
-        result = await _listTodos(request);
-        break;
-      case 'deleteTodo':
-        result = await _deleteTodo(request);
-        break;
-      case 'completeTodo':
-        result = await _completeTodo(request);
-        break;
-      case 'assignTodoToUser':
-        result = await _assignTodoToUser(request);
-        break;
-      case 'removeTodoFromUser':
-        result = await _removeTodoFromUser(request);
-        break;
-      case 'getTodosForUser':
-        result = await _getTodosForUser(request);
-        break;
+      case 'search': result = await _search(request); break;
+      case 'createUser': result = await _createUser(request); break;
+      case 'getUserTodos': result = await _getUserTodos(request); break;
+      case 'getUser': result = await _getUser(request); break;
+      case 'listUsers': result = await _listUsers(request); break;
+      case 'searchUsers': result = await _searchUsers(request); break;
+      case 'createTodo': result = await _createTodo(request); break;
+      case 'getTodo': result = await _getTodo(request); break;
+      case 'listTodos': result = await _listTodos(request); break;
+      case 'deleteTodo': result = await _deleteTodo(request); break;
+      case 'completeTodo': result = await _completeTodo(request); break;
+      case 'assignTodoToUser': result = await _assignTodoToUser(request); break;
+      case 'removeTodoFromUser': result = await _removeTodoFromUser(request); break;
+      case 'getTodosForUser': result = await _getTodosForUser(request); break;
       default:
         throw StateError('Unknown tool: $toolName');
     }
@@ -877,15 +645,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
     if (result == null) return 'null';
     try {
       if (result is List) {
-        final items = result
-            .map((e) {
-              if (e == null) return null;
-              final toJson = e.toJson;
-              if (toJson != null && toJson is Function) return toJson();
-              return e.toString();
-            })
-            .where((e) => e != null)
-            .toList();
+        final items = result.map((e) {
+          if (e == null) return null;
+          final toJson = e.toJson;
+          if (toJson != null && toJson is Function) return toJson();
+          return e.toString();
+        }).where((e) => e != null).toList();
         return jsonEncode(items);
       }
       final toJson = result.toJson;
