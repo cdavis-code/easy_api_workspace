@@ -5,10 +5,9 @@ import 'package:source_gen/source_gen.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/constant/value.dart';
-import '../stubs.dart';
-import 'templates.dart';
-import 'openapi_builder.dart';
-import 'openapi_dart_template.dart';
+import 'package:easy_api_generator/builder/templates.dart';
+import 'package:easy_api_generator/builder/openapi_builder.dart';
+import 'package:easy_api_generator/builder/openapi_dart_template.dart';
 
 /// Builder that generates MCP server code from @Server and @Tool annotations.
 ///
@@ -41,50 +40,38 @@ class McpBuilder extends Builder {
 
     final library = await buildStep.resolver.libraryFor(inputId);
 
-    // Only process files with @Server annotation
-    if (!_hasServerAnnotation(library)) return;
+    // Single pass: find the first @Server annotation in the library and
+    // resolve every field we care about. Returns null when the library
+    // carries no @Server (or deprecated @Mcp typedef).
+    final config = _extractServerConfig(library);
+    if (config == null) return;
 
-    // Extract tool prefix from @Server annotation (applies to all tools in scope)
-    final toolPrefix = _findToolPrefix(library);
-
-    // Extract auto class prefix setting from @Server annotation
-    final autoClassPrefix = _findAutoClassPrefix(library);
-
-    // Aggregate tools from this library AND all its imports
-    final tools = await _extractAllTools(library, toolPrefix, autoClassPrefix);
+    // Aggregate tools from this library AND all its package-local imports
+    final tools = await _extractAllTools(
+      library,
+      config.toolPrefix,
+      config.autoClassPrefix,
+    );
 
     if (tools.isEmpty) return; // No tools found anywhere
 
-    // Extract transport configuration from @Server annotation
-    final transport = _findTransport(library);
-
-    // For HTTP transport, extract port and address configuration
-    // These settings customize how the HTTP server binds to the network
-    final port = _findPort(library);
-    final address = _findAddress(library);
-
-    // Extract code mode configuration from @Server annotation
-    final codeMode = _findCodeMode(library);
-    final codeModeTimeout = _findCodeModeTimeout(library);
-    final logErrors = _findLogErrors(library);
-
     // Conditionally generate MCP server code (gated by generateMcp flag)
-    if (_shouldGenerateMcp(library)) {
+    if (config.generateMcp) {
       // Generate the appropriate server code based on transport type
-      final generated = transport == 'http'
+      final generated = config.transport == 'http'
           ? HttpTemplate.generate(
               tools,
-              port,
-              address,
-              codeMode: codeMode,
-              codeModeTimeout: codeModeTimeout,
-              logErrors: logErrors,
+              config.port,
+              config.address,
+              codeMode: config.codeMode,
+              codeModeTimeout: config.codeModeTimeout,
+              logErrors: config.logErrors,
             )
           : StdioTemplate.generate(
               tools,
-              codeMode: codeMode,
-              codeModeTimeout: codeModeTimeout,
-              logErrors: logErrors,
+              codeMode: config.codeMode,
+              codeModeTimeout: config.codeModeTimeout,
+              logErrors: config.logErrors,
             );
 
       // Write the generated server code
@@ -94,7 +81,7 @@ class McpBuilder extends Builder {
       );
 
       // Optionally generate JSON metadata file
-      if (_shouldGenerateJson(library)) {
+      if (config.generateJson) {
         final jsonMetadata = _generateJsonMetadata(tools);
         await buildStep.writeAsString(
           inputId.changeExtension('.mcp.json'),
@@ -104,8 +91,13 @@ class McpBuilder extends Builder {
     }
 
     // Conditionally generate REST/OpenAPI output (gated by generateRest flag)
-    if (_shouldGenerateRest(library)) {
-      final openApiSpec = OpenApiBuilder.build(tools, transport, port, address);
+    if (config.generateRest) {
+      final openApiSpec = OpenApiBuilder.build(
+        tools,
+        config.transport,
+        config.port,
+        config.address,
+      );
       await buildStep.writeAsString(
         inputId.changeExtension('.openapi.json'),
         const JsonEncoder.withIndent('  ').convert(openApiSpec),
@@ -114,9 +106,10 @@ class McpBuilder extends Builder {
       // Generate .openapi.dart REST server
       final openApiDartCode = OpenApiDartTemplate.generate(
         tools,
-        port,
-        address,
+        config.port,
+        config.address,
         openApiSpec,
+        logErrors: config.logErrors,
       );
       await buildStep.writeAsString(
         inputId.changeExtension('.openapi.dart'),
@@ -410,7 +403,6 @@ class McpBuilder extends Builder {
       params.add(<String, dynamic>{
         'name': param.name,
         'type': typeString,
-        'schema': _dartTypeToJsonSchema(typeString),
         'schemaMap': schemaMap,
         'isOptional': isOptional,
         'isNamed': isNamedParam,
@@ -666,35 +658,6 @@ class McpBuilder extends Builder {
     return <String, dynamic>{'type': 'object'};
   }
 
-  String _dartTypeToJsonSchema(String rawType) {
-    final dartType = rawType.endsWith('?')
-        ? rawType.substring(0, rawType.length - 1)
-        : rawType;
-    switch (dartType) {
-      case 'int':
-        return "{'type': 'integer'}";
-      case 'double':
-      case 'num':
-        return "{'type': 'number'}";
-      case 'String':
-        return "{'type': 'string'}";
-      case 'bool':
-        return "{'type': 'boolean'}";
-      case 'List':
-        return "{'type': 'array', 'items': <String, dynamic>{}}";
-      case 'Map':
-      case 'dynamic':
-        return "{'type': 'object'}";
-      case 'DateTime':
-        return "{'type': 'string', 'format': 'date-time'}";
-      default:
-        if (dartType.startsWith('List<') || dartType.startsWith('Map<')) {
-          return "{'type': 'array'}";
-        }
-        return "{'type': 'object'}";
-    }
-  }
-
   Map<String, dynamic> _generateJsonMetadata(List<Map<String, dynamic>> tools) {
     final toolList = <Map<String, dynamic>>[];
 
@@ -708,7 +671,22 @@ class McpBuilder extends Builder {
         final externalName =
             (p['parameterMetadata']?['alias'] as String?) ??
             p['name'] as String;
-        properties[externalName] = p['schemaMap'] ?? {'type': 'object'};
+        // Clone so we don't mutate the shared schemaMap used by the Dart template.
+        final baseSchema = Map<String, dynamic>.from(
+          (p['schemaMap'] as Map<String, dynamic>?) ??
+              <String, dynamic>{'type': 'object'},
+        );
+        final meta = p['parameterMetadata'] as Map<String, dynamic>?;
+        if (meta != null && meta['sensitive'] == true) {
+          // Surface sensitivity to MCP clients so they can mask values in UI/logs.
+          // `x-sensitive` is a non-standard extension; `format: 'password'` is the
+          // closest OpenAPI/JSON-Schema convention for string secrets.
+          baseSchema['x-sensitive'] = true;
+          if (baseSchema['type'] == 'string') {
+            baseSchema['format'] = 'password';
+          }
+        }
+        properties[externalName] = baseSchema;
         if (p['isOptional'] != true) required.add(externalName);
       }
 
@@ -726,444 +704,91 @@ class McpBuilder extends Builder {
     return <String, dynamic>{'schemaVersion': '1.0', 'tools': toolList};
   }
 
-  /// Checks if the library has a @Server annotation.
-  bool _hasServerAnnotation(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
+  /// Walks the library's top-level functions, classes, and class methods
+  /// looking for the first `@Server` annotation. Returns `null` if none is
+  /// found. When an annotation is found, every field of [_ServerConfig] is
+  /// resolved from it (falling back to documented defaults).
+  ///
+  /// Replaces a previous generation of per-field scan methods that each
+  /// walked the AST independently. Traversing once is both simpler and
+  /// avoids 12× redundant analyzer work per build.
+  _ServerConfig? _extractServerConfig(LibraryElement library) {
+    const serverChecker = TypeChecker.fromUrl(
       'package:easy_api_annotations/mcp_annotations.dart#Server',
     );
 
-    // Check top-level functions
+    DartObject? annotation;
+
+    // Top-level functions
     for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        return true;
-      }
+      annotation = serverChecker.firstAnnotationOf(element);
+      if (annotation != null) break;
     }
 
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        return true;
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          return true;
+    // Classes + their methods
+    if (annotation == null) {
+      for (final element in library.classes) {
+        annotation = serverChecker.firstAnnotationOf(element);
+        if (annotation != null) break;
+        for (final method in element.methods) {
+          annotation = serverChecker.firstAnnotationOf(method);
+          if (annotation != null) break;
         }
+        if (annotation != null) break;
       }
     }
 
-    return false;
+    if (annotation == null) return null;
+
+    final reader = ConstantReader(annotation);
+    return _ServerConfig(
+      transport: _readTransport(reader),
+      port: _peekInt(reader, 'port') ?? 3000,
+      address: _peekString(reader, 'address') ?? '127.0.0.1',
+      toolPrefix: _peekString(reader, 'toolPrefix'),
+      autoClassPrefix: _peekBool(reader, 'autoClassPrefix') ?? false,
+      generateJson: _peekBool(reader, 'generateJson') ?? false,
+      generateMcp: _peekBool(reader, 'generateMcp') ?? true,
+      generateRest: _peekBool(reader, 'generateRest') ?? false,
+      codeMode: _peekBool(reader, 'codeMode') ?? false,
+      codeModeTimeout: _peekInt(reader, 'codeModeTimeout') ?? 30,
+      logErrors: _peekBool(reader, 'logErrors') ?? false,
+    );
   }
 
-  bool _shouldGenerateJson(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
-
-    // Check top-level functions
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final reader = ConstantReader(annotation);
-        final generateJson = reader.peek('generateJson');
-        if (generateJson != null) {
-          return generateJson.boolValue;
-        }
-      }
+  /// Reads the `transport` enum field and maps it to the canonical
+  /// `'stdio'` or `'http'` string used downstream. Uses the enum's `index`
+  /// field because analyzer's `getField(name)` does not return the
+  /// constant's symbolic name directly.
+  String _readTransport(ConstantReader reader) {
+    final transport = reader.peek('transport');
+    if (transport == null) return 'stdio';
+    final indexField = transport.objectValue.getField('index');
+    if (indexField != null) {
+      final index = indexField.toIntValue();
+      // Keep in sync with `McpTransport` declaration order in
+      // packages/easy_api_annotations/lib/mcp_annotations.dart.
+      if (index == 1) return 'http';
     }
-
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final reader = ConstantReader(annotation);
-        final generateJson = reader.peek('generateJson');
-        if (generateJson != null) {
-          return generateJson.boolValue;
-        }
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final reader = ConstantReader(methodAnnotation);
-          final generateJson = reader.peek('generateJson');
-          if (generateJson != null) {
-            return generateJson.boolValue;
-          }
-        }
-      }
-    }
-
-    return false;
-  }
-
-  bool _shouldGenerateRest(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
-
-    // Check top-level functions
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final reader = ConstantReader(annotation);
-        final generateRest = reader.peek('generateRest');
-        if (generateRest != null) {
-          return generateRest.boolValue;
-        }
-      }
-    }
-
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final reader = ConstantReader(annotation);
-        final generateRest = reader.peek('generateRest');
-        if (generateRest != null) {
-          return generateRest.boolValue;
-        }
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final reader = ConstantReader(methodAnnotation);
-          final generateRest = reader.peek('generateRest');
-          if (generateRest != null) {
-            return generateRest.boolValue;
-          }
-        }
-      }
-    }
-
-    return false;
-  }
-
-  bool _shouldGenerateMcp(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
-
-    // Check top-level functions
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final reader = ConstantReader(annotation);
-        final generateMcp = reader.peek('generateMcp');
-        if (generateMcp != null) {
-          return generateMcp.boolValue;
-        }
-      }
-    }
-
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final reader = ConstantReader(annotation);
-        final generateMcp = reader.peek('generateMcp');
-        if (generateMcp != null) {
-          return generateMcp.boolValue;
-        }
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final reader = ConstantReader(methodAnnotation);
-          final generateMcp = reader.peek('generateMcp');
-          if (generateMcp != null) {
-            return generateMcp.boolValue;
-          }
-        }
-      }
-    }
-
-    return true; // Default to true for backward compatibility
-  }
-
-  String _findTransport(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
-
-    // Check top-level functions
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final transport = _extractTransportFromAnnotation(annotation);
-        if (transport != null) return transport;
-      }
-    }
-
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final transport = _extractTransportFromAnnotation(annotation);
-        if (transport != null) return transport;
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final transport = _extractTransportFromAnnotation(methodAnnotation);
-          if (transport != null) return transport;
-        }
-      }
-    }
-
     return 'stdio';
   }
 
-  String? _extractTransportFromAnnotation(DartObject annotation) {
-    final reader = ConstantReader(annotation);
-    final transport = reader.peek('transport');
-    if (transport != null) {
-      // Try to read enum value by name first (more reliable)
-      final transportObject = transport.objectValue;
-      final type = transportObject.type;
-      if (type != null) {
-        final enumElement = type.element;
-        if (enumElement is EnumElement) {
-          // Get the enum field name from the object value
-          for (final field in enumElement.constants) {
-            final fieldName = field.name;
-            if (fieldName == null) continue;
-            final fieldValue = transportObject.getField(fieldName);
-            if (fieldValue != null) {
-              // This is the matching enum value
-              if (fieldName == 'http') return 'http';
-              if (fieldName == 'stdio') return 'stdio';
-            }
-          }
-        }
-      }
-      // Fallback to index-based check
-      final transportField = transportObject.getField('index');
-      if (transportField != null) {
-        final transportValue = transportField.toIntValue();
-        if (transportValue == 1) return 'http';
-      }
-    }
-    return null;
+  String? _peekString(ConstantReader reader, String field) {
+    final value = reader.peek(field);
+    if (value == null || value.isNull || !value.isString) return null;
+    return value.stringValue;
   }
 
-  /// Finds the HTTP port from @Server annotations in the library.
-  ///
-  /// Searches through top-level functions, classes, and methods for @Server
-  /// annotations and extracts the port parameter. This port determines
-  /// which network port the HTTP server will listen on.
-  ///
-  /// Returns 3000 (the default port) if no port is explicitly specified
-  /// in the annotation.
-  int _findPort(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
-
-    // Check top-level functions for @Server annotation with port
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final port = _extractPortFromAnnotation(annotation);
-        if (port != null) return port;
-      }
-    }
-
-    // Check classes and their methods for @Server annotation with port
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final port = _extractPortFromAnnotation(annotation);
-        if (port != null) return port;
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final port = _extractPortFromAnnotation(methodAnnotation);
-          if (port != null) return port;
-        }
-      }
-    }
-
-    return 3000; // Default port for HTTP transport
+  int? _peekInt(ConstantReader reader, String field) {
+    final value = reader.peek(field);
+    if (value == null || value.isNull || !value.isInt) return null;
+    return value.intValue;
   }
 
-  /// Extracts the port value from a @Server annotation.
-  ///
-  /// Returns null if the port field is not explicitly set in the annotation.
-  /// The port determines which network port the HTTP server will listen on.
-  int? _extractPortFromAnnotation(DartObject annotation) {
-    final reader = ConstantReader(annotation);
-    final portField = reader.peek('port');
-    if (portField != null) {
-      return portField.intValue;
-    }
-    return null;
-  }
-
-  /// Finds the HTTP bind address from @Server annotations in the library.
-  ///
-  /// Searches through top-level functions, classes, and methods for @Server
-  /// annotations and extracts the address parameter. This address determines
-  /// which network interface the HTTP server will bind to.
-  ///
-  /// Common address values:
-  /// - '127.0.0.1' (default): Loopback interface, only accessible locally
-  /// - '0.0.0.0': All interfaces, accessible from other machines (useful for Docker/containers)
-  /// - Specific IP: Bind to a specific network interface
-  ///
-  /// Returns '127.0.0.1' if no address is explicitly specified.
-  String _findAddress(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
-
-    // Check top-level functions
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final address = _extractAddressFromAnnotation(annotation);
-        if (address != null) return address;
-      }
-    }
-
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final address = _extractAddressFromAnnotation(annotation);
-        if (address != null) return address;
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final address = _extractAddressFromAnnotation(methodAnnotation);
-          if (address != null) return address;
-        }
-      }
-    }
-
-    return '127.0.0.1'; // Default address (loopback)
-  }
-
-  String? _extractAddressFromAnnotation(DartObject annotation) {
-    final reader = ConstantReader(annotation);
-    final addressField = reader.peek('address');
-    if (addressField != null) {
-      return addressField.stringValue;
-    }
-    return null;
-  }
-
-  /// Finds the tool prefix from @Server annotations in the library.
-  ///
-  /// Searches through top-level functions, classes, and methods for @Server
-  /// annotations and extracts the toolPrefix parameter. This prefix is
-  /// applied to all tool names in the generated MCP server.
-  ///
-  /// Returns null if no prefix is explicitly specified.
-  String? _findToolPrefix(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
-
-    // Check top-level functions
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final prefix = _extractToolPrefixFromAnnotation(annotation);
-        if (prefix != null) return prefix;
-      }
-    }
-
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final prefix = _extractToolPrefixFromAnnotation(annotation);
-        if (prefix != null) return prefix;
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final prefix = _extractToolPrefixFromAnnotation(methodAnnotation);
-          if (prefix != null) return prefix;
-        }
-      }
-    }
-
-    return null; // No prefix specified
-  }
-
-  String? _extractToolPrefixFromAnnotation(DartObject annotation) {
-    final reader = ConstantReader(annotation);
-    final prefixField = reader.peek('toolPrefix');
-    if (prefixField != null) {
-      return prefixField.stringValue;
-    }
-    return null;
-  }
-
-  /// Finds the auto class prefix setting from @Server annotations in the library.
-  ///
-  /// Searches through top-level functions, classes, and methods for @Server
-  /// annotations and extracts the autoClassPrefix parameter. When true,
-  /// tool names are automatically prefixed with their class name.
-  ///
-  /// Returns false if no setting is explicitly specified.
-  bool _findAutoClassPrefix(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
-
-    // Check top-level functions
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final autoPrefix = _extractAutoClassPrefixFromAnnotation(annotation);
-        if (autoPrefix != null) return autoPrefix;
-      }
-    }
-
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final autoPrefix = _extractAutoClassPrefixFromAnnotation(annotation);
-        if (autoPrefix != null) return autoPrefix;
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final autoPrefix = _extractAutoClassPrefixFromAnnotation(
-            methodAnnotation,
-          );
-          if (autoPrefix != null) return autoPrefix;
-        }
-      }
-    }
-
-    return false; // Default to false for backward compatibility
-  }
-
-  bool? _extractAutoClassPrefixFromAnnotation(DartObject annotation) {
-    final reader = ConstantReader(annotation);
-    final autoPrefixField = reader.peek('autoClassPrefix');
-    if (autoPrefixField != null) {
-      return autoPrefixField.boolValue;
-    }
-    return null;
+  bool? _peekBool(ConstantReader reader, String field) {
+    final value = reader.peek(field);
+    if (value == null || value.isNull || !value.isBool) return null;
+    return value.boolValue;
   }
 
   bool _extractToolCodeMode(DartObject? toolAnnotation) {
@@ -1190,148 +815,37 @@ class McpBuilder extends Builder {
     }
     return false;
   }
+}
 
-  /// Finds the code mode setting from @Server annotations in the library.
-  ///
-  /// When true, the generated server includes `search` and `execute` tools
-  /// that allow LLMs to discover and orchestrate multiple tool calls in a
-  /// single JavaScript program.
-  ///
-  /// Returns false if not explicitly specified.
-  bool _findCodeMode(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
+/// Immutable view of the fields on a `@Server` annotation, resolved with
+/// documented defaults. Populated by [McpBuilder._extractServerConfig] so the
+/// rest of the builder never needs to re-scan the AST.
+class _ServerConfig {
+  const _ServerConfig({
+    required this.transport,
+    required this.port,
+    required this.address,
+    required this.toolPrefix,
+    required this.autoClassPrefix,
+    required this.generateJson,
+    required this.generateMcp,
+    required this.generateRest,
+    required this.codeMode,
+    required this.codeModeTimeout,
+    required this.logErrors,
+  });
 
-    // Check top-level functions
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final codeMode = _extractCodeModeFromAnnotation(annotation);
-        if (codeMode != null) return codeMode;
-      }
-    }
-
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final codeMode = _extractCodeModeFromAnnotation(annotation);
-        if (codeMode != null) return codeMode;
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final codeMode = _extractCodeModeFromAnnotation(methodAnnotation);
-          if (codeMode != null) return codeMode;
-        }
-      }
-    }
-
-    return false; // Default to false for backward compatibility
-  }
-
-  bool? _extractCodeModeFromAnnotation(DartObject annotation) {
-    final reader = ConstantReader(annotation);
-    final codeModeField = reader.peek('codeMode');
-    if (codeModeField != null && !codeModeField.isNull) {
-      return codeModeField.boolValue;
-    }
-    return null;
-  }
-
-  /// Finds the code mode timeout from @Server annotations in the library.
-  ///
-  /// Returns 30 if no timeout is explicitly specified.
-  int _findCodeModeTimeout(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
-
-    // Check top-level functions
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final timeout = _extractCodeModeTimeoutFromAnnotation(annotation);
-        if (timeout != null) return timeout;
-      }
-    }
-
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final timeout = _extractCodeModeTimeoutFromAnnotation(annotation);
-        if (timeout != null) return timeout;
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final timeout = _extractCodeModeTimeoutFromAnnotation(
-            methodAnnotation,
-          );
-          if (timeout != null) return timeout;
-        }
-      }
-    }
-
-    return 30; // Default timeout
-  }
-
-  int? _extractCodeModeTimeoutFromAnnotation(DartObject annotation) {
-    final reader = ConstantReader(annotation);
-    final timeoutField = reader.peek('codeModeTimeout');
-    if (timeoutField != null && !timeoutField.isNull) {
-      return timeoutField.intValue;
-    }
-    return null;
-  }
-
-  /// Extracts the logErrors flag from the @Server annotation.
-  bool _findLogErrors(LibraryElement library) {
-    const mcpChecker = TypeChecker.fromUrl(
-      'package:easy_api_annotations/mcp_annotations.dart#Server',
-    );
-
-    // Check top-level functions
-    for (final element in library.topLevelFunctions) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final value = _extractLogErrorsFromAnnotation(annotation);
-        if (value != null) return value;
-      }
-    }
-
-    // Check classes
-    for (final element in library.classes) {
-      final annotation = mcpChecker.firstAnnotationOf(element);
-      if (annotation != null) {
-        final value = _extractLogErrorsFromAnnotation(annotation);
-        if (value != null) return value;
-      }
-      // Check methods within classes
-      for (final method in element.methods) {
-        final methodAnnotation = mcpChecker.firstAnnotationOf(method);
-        if (methodAnnotation != null) {
-          final value = _extractLogErrorsFromAnnotation(methodAnnotation);
-          if (value != null) return value;
-        }
-      }
-    }
-
-    return false; // Default to false
-  }
-
-  bool? _extractLogErrorsFromAnnotation(DartObject annotation) {
-    final reader = ConstantReader(annotation);
-    final field = reader.peek('logErrors');
-    if (field != null && !field.isNull) {
-      return field.boolValue;
-    }
-    return null;
-  }
+  final String transport;
+  final int port;
+  final String address;
+  final String? toolPrefix;
+  final bool autoClassPrefix;
+  final bool generateJson;
+  final bool generateMcp;
+  final bool generateRest;
+  final bool codeMode;
+  final int codeModeTimeout;
+  final bool logErrors;
 }
 
 Builder mcpBuilder(BuilderOptions options) => McpBuilder();

@@ -116,11 +116,11 @@ example/
 
 ```yaml
 dependencies:
-  easy_api_annotations: ^0.5.0
+  easy_api_annotations: ^0.6.0
 
 dev_dependencies:
   build_runner: ^2.4.0
-  easy_api_generator: ^0.5.0
+  easy_api_generator: ^0.6.0
 ```
 
 ### 2. Annotate Your Functions
@@ -298,6 +298,9 @@ When enabled, an `execute` tool is generated that spawns a sandboxed Node.js sub
 **Requirements:** Node.js must be installed on the system.
 
 > **Learn More:** Read Anthropic's comprehensive guide on [Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) to understand the efficiency gains and architectural patterns.
+
+> **Security note — Code Mode is an orchestration primitive, not a security sandbox.**
+> The spawned Node.js subprocess runs with a 64 MB heap cap and a wall-clock timeout, but it has full access to the host filesystem, network, and `require('child_process')`. Treat any code that reaches `execute` with the same trust level as code you run locally, and enable Code Mode only for trusted LLMs / operators. For stricter isolation, consider running your MCP server inside a container or enabling Node.js [`--permission`](https://nodejs.org/api/permissions.html) flags (Node ≥ 20).
 
 ### REST API Specification Generation
 

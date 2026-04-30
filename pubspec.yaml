@@ -61,7 +61,7 @@ melos:
       dart pub publish
     publish:all: >
       melos run publish:annotations &&
-      echo "easy_api_annotations published. Update easy_api_generator dependency to ^0.1.2 and run:" &&
+      echo "easy_api_annotations published. Update easy_api_generator dependency to ^0.6.0 and run:" &&
       echo "melos run publish:generator"
 
     # Pre-commit / CI

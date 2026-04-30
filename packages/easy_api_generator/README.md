@@ -20,11 +20,11 @@ Processes Dart code annotated with the `easy_api_annotations` package to produce
 
 ```yaml
 dependencies:
-  easy_api_annotations: ^0.5.0
+  easy_api_annotations: ^0.6.0
 
 dev_dependencies:
   build_runner: ^2.4.0
-  easy_api_generator: ^0.5.0
+  easy_api_generator: ^0.6.0
 ```
 
 ## Usage

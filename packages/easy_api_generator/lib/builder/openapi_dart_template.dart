@@ -17,12 +17,16 @@ class OpenApiDartTemplate {
   /// [port] — HTTP port to bind to
   /// [address] — HTTP bind address
   /// [openApiSpec] — the already-built OpenAPI 3.0 spec map
+  /// [logErrors] — when `true`, writes detailed exceptions + stack traces to
+  ///   `stderr` while still returning a generic 500 body to the client.
+  ///   Mirrors `@Server(logErrors:)` behavior in the MCP templates.
   static String generate(
     List<Map<String, dynamic>> tools,
     int port,
     String address,
-    Map<String, dynamic> openApiSpec,
-  ) {
+    Map<String, dynamic> openApiSpec, {
+    bool logErrors = false,
+  }) {
     // ── Source imports (aliased, same pattern as HttpTemplate) ──────────
     final sourceImports = <String, String>{};
     for (final tool in tools) {
@@ -127,10 +131,15 @@ class OpenApiDartTemplate {
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' as io;
 
 import 'package:shelf_plus/shelf_plus.dart';
 
 $sourceImportStatements
+
+/// When true, detailed exceptions and stack traces are written to stderr.
+/// User-facing 500 responses remain generic regardless of this flag.
+const bool _logErrors = $logErrors;
 
 void main() => shelfRun(init, defaultBindPort: $port, defaultBindAddress: $addressExpression);
 
@@ -358,7 +367,12 @@ Future<Response> $handlerFnName(Request request$pathParamArgs) async {
   try {
 $extractionBlock
 $responseCode
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] $handlerFnName: \$e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},

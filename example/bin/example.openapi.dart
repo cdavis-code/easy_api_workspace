@@ -2,11 +2,16 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' as io;
 
 import 'package:shelf_plus/shelf_plus.dart';
 
 import 'package:mcp_example/src/user_store.dart' as user_store;
 import 'package:mcp_example/src/todo_store.dart' as todo_store;
+
+/// When true, detailed exceptions and stack traces are written to stderr.
+/// User-facing 500 responses remain generic regardless of this flag.
+const bool _logErrors = true;
 
 void main() => shelfRun(init, defaultBindPort: 8080, defaultBindAddress: '0.0.0.0');
 
@@ -38,7 +43,12 @@ Future<Response> _handle_get_listUsers(Request request) async {
         body: jsonEncode(serialized),
         headers: {'Content-Type': 'application/json'},
       );
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_get_listUsers: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -57,7 +67,12 @@ Future<Response> _handle_post_createUser(Request request) async {
         body: jsonEncode(serialized),
         headers: {'Content-Type': 'application/json'},
       );
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_post_createUser: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -81,7 +96,12 @@ Future<Response> _handle_get_searchUsers(Request request) async {
         body: jsonEncode(serialized),
         headers: {'Content-Type': 'application/json'},
       );
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_get_searchUsers: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -98,7 +118,12 @@ Future<Response> _handle_get_getUser(Request request, String usersIdParam) async
         body: jsonEncode(serialized),
         headers: {'Content-Type': 'application/json'},
       );
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_get_getUser: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -117,7 +142,12 @@ Future<Response> _handle_delete_deleteUser(Request request, String usersIdParam)
         );
       }
       return Response(204);
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_delete_deleteUser: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -141,7 +171,12 @@ Future<Response> _handle_get_getUser_todo(Request request, String user_todosIdPa
         body: jsonEncode(serialized),
         headers: {'Content-Type': 'application/json'},
       );
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_get_getUser_todo: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -158,7 +193,12 @@ Future<Response> _handle_get_listTodos(Request request) async {
         body: jsonEncode(serialized),
         headers: {'Content-Type': 'application/json'},
       );
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_get_listTodos: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -176,7 +216,12 @@ Future<Response> _handle_post_createTodo(Request request) async {
         body: jsonEncode(serialized),
         headers: {'Content-Type': 'application/json'},
       );
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_post_createTodo: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -193,7 +238,12 @@ Future<Response> _handle_get_getTodo(Request request, String todosIdParam) async
         body: jsonEncode(serialized),
         headers: {'Content-Type': 'application/json'},
       );
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_get_getTodo: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -212,7 +262,12 @@ Future<Response> _handle_delete_deleteTodo(Request request, String todosIdParam)
         );
       }
       return Response(204);
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_delete_deleteTodo: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -246,7 +301,12 @@ Future<Response> _handle_delete_deleteRemove_todo_from_user(Request request, Str
         );
       }
       return Response(204);
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_delete_deleteRemove_todo_from_user: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},
@@ -270,7 +330,12 @@ Future<Response> _handle_get_getTodos_for_user(Request request, String todos_for
         body: jsonEncode(serialized),
         headers: {'Content-Type': 'application/json'},
       );
-  } catch (e) {
+  } catch (e, st) {
+    if (_logErrors) {
+      io.stderr.writeln('[easy_api] _handle_get_getTodos_for_user: $e');
+      io.stderr.writeln(st);
+      await io.stderr.flush();
+    }
     return Response.internalServerError(
       body: jsonEncode({'error': 'An error occurred while processing the request'}),
       headers: {'Content-Type': 'application/json'},

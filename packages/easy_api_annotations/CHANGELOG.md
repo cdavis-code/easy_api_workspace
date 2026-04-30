@@ -5,15 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ## [0.6.0] - Unreleased
 
 ### Changed
+- Clarified the `Parameter.sensitive` dartdoc to describe the concrete effect in generated artifacts (— `x-sensitive` + `format: 'password'` in `.mcp.json`, `writeOnly: true` + `format: 'password'` in `.openapi.json`). Previously the docstring promised masking behavior the generator did not actually implement.
 - **Renamed `@Mcp` annotation to `@Server`** — new primary annotation name
 - Renamed `generateOpenApi` parameter to `generateRest`
 - Added `generateMcp` parameter (default: true)
 - Added `generateRest` parameter (default: false)
+- Marked `@Server`, `@Tool`, and `@Parameter` as `@immutable` to document intent and catch accidental mutation
+- Lowered SDK constraint to `^3.9.0` to match `easy_api_generator`
+- Fixed doc mismatch on `@Server.address` default (it is `'127.0.0.1'`, not `'localhost'`)
+
+### Removed
+- Dropped the unused direct `analyzer` dependency — the annotations package no longer pulls analyzer into consumer projects
+- Removed the public `package:easy_api_annotations/stubs.dart` library; it was dead code and shipped types that duplicated `package:meta`
+- Removed the long-deprecated `Tool.execution` field (was a raw `Map<String, Object?>?` reserved for a future feature)
 
 ### Deprecated
 - `@Mcp` typedef — still available for backward compatibility, emits deprecation warning

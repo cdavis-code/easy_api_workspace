@@ -5,15 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ## [0.6.0] - Unreleased
+
+### Added
+- REST template now honors `@Server(logErrors:)`, mirroring the MCP templates: detailed exceptions + stack traces go to `stderr` when `logErrors: true`, while the 500 response body stays generic. Previously the REST template silently swallowed caught exceptions, leaving operators with no diagnostic signal.
+- `@Parameter(sensitive: true)` is now actually emitted: `.mcp.json` inputSchema adds `"x-sensitive": true` on the property, `.openapi.json` adds `writeOnly: true`, and string-typed sensitive parameters also get `format: 'password'`. Previously the flag was extracted but never written anywhere.
 
 ### Changed
 - **Renamed `@Mcp` to `@Server`** — generator now recognizes `@Server` as the primary annotation
 - Renamed `generateOpenApi` parameter to `generateRest`
 - Added `generateMcp` parameter (default: true) to control .mcp.dart generation
 - Added `generateRest` parameter (default: false) to control .openapi.json generation
+- Consolidated the 12 per-field `@Server` annotation scans in `McpBuilder` into a single `_extractServerConfig` AST walk; the library is now traversed once per build instead of 12 times
+- Removed the dead `_dartTypeToJsonSchema` helper and its unread `'schema'` entry from the collected parameter maps; callers already rely on the richer `schemaMap` produced by `_introspectType`
+- `SchemaBuilder` and `OpenApiBuilder` now expose private constructors (pure static helpers — not meant to be instantiated)
+- Enabled strict analyzer modes (`strict-casts`, `strict-inference`, `strict-raw-types`) and added `always_declare_return_types`, `always_use_package_imports`, `avoid_catches_without_on_clauses`, `unawaited_futures` lints
+
+### Removed
+- **BREAKING:** Removed `lib/stubs.dart` — obsolete re-export layer; `package:build` is already a direct dependency
+- **BREAKING:** Removed `lib/builder/doc_extractor.dart` along with the unused public classes `ToolInfo`, `ParameterInfo`, and `DocExtractor` — these were never wired into the builder after the full analyzer integration landed
+- Deleted the placeholder `test/mcp_builder_test.dart` that only asserted `expect(true, isTrue)`
+- Dropped unused `code_builder` and `json_annotation` direct dependencies
 
 ### Deprecated
 - `@Mcp` typedef — still recognized for backward compatibility

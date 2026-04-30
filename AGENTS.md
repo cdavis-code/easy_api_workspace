@@ -162,6 +162,9 @@ branch that touches `packages/` and immediately after any pana warning.
 - Escape all special characters in generated strings
 
 ## Recent Changes
+- Renamed `@Mcp` to `@Server` and introduced `generateMcp` / `generateRest` parameters (0.6.0)
+- Consolidated the 12 per-field `@Server` scan loops into a single AST walk via `_extractServerConfig` (0.6.0)
+- Dropped `lib/stubs.dart`, `lib/builder/doc_extractor.dart`, `code_builder`, and `json_annotation` from `easy_api_generator`; dropped `analyzer`, `stubs.dart`, and the deprecated `Tool.execution` field from `easy_api_annotations` (0.6.0)
 - Added Code Mode with Node.js sandbox for batch tool orchestration (0.5.0)
 - Added OpenAPI 3.0 specification generation (0.5.0)
 - Added rich tool naming: custom names, class prefixes, tool prefixes (0.3.0)

@@ -1,4 +1,5 @@
 import 'package:easy_api_generator/builder/templates.dart';
+import 'package:easy_api_generator/builder/openapi_dart_template.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -567,6 +568,88 @@ void main() {
         expect(result, contains('if (_logErrors)'));
         expect(result, contains("io.stderr.writeln('[easy_api]"));
       });
+    });
+  });
+
+  group('OpenApiDartTemplate', () {
+    late List<Map<String, dynamic>> tools;
+    late Map<String, dynamic> openApiSpec;
+
+    setUp(() {
+      tools = <Map<String, dynamic>>[
+        {
+          'name': 'createUser',
+          'methodName': 'createUser',
+          'description': 'Create a user',
+          'parameters': <Map<String, dynamic>>[
+            {'name': 'name', 'type': 'String', 'isOptional': false},
+          ],
+          'isAsync': true,
+          'sourceImport': 'package:example/src/user_store.dart',
+          'sourceAlias': 'lib',
+          'className': 'UserStore',
+          'isStatic': false,
+        },
+      ];
+      openApiSpec = <String, dynamic>{
+        'openapi': '3.0.3',
+        'paths': <String, dynamic>{
+          '/users': <String, dynamic>{
+            'post': <String, dynamic>{
+              'operationId': 'createUser',
+              'x-tool-name': 'createUser',
+              'requestBody': <String, dynamic>{
+                'content': <String, dynamic>{
+                  'application/json': <String, dynamic>{
+                    'schema': <String, dynamic>{
+                      'type': 'object',
+                      'properties': <String, dynamic>{
+                        'name': <String, dynamic>{'type': 'string'},
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+    });
+
+    test(
+      'emits _logErrors const and conditional stderr logging when logErrors is true',
+      () {
+        final result = OpenApiDartTemplate.generate(
+          tools,
+          8080,
+          '127.0.0.1',
+          openApiSpec,
+          logErrors: true,
+        );
+        expect(result, contains('const bool _logErrors = true;'));
+        expect(result, contains("import 'dart:io' as io;"));
+        expect(result, contains('if (_logErrors)'));
+        expect(result, contains("io.stderr.writeln('[easy_api]"));
+        // 500 body must stay generic regardless of logErrors.
+        expect(
+          result,
+          contains("'error': 'An error occurred while processing the request'"),
+        );
+      },
+    );
+
+    test('defaults logErrors to false and keeps generic 500 body', () {
+      final result = OpenApiDartTemplate.generate(
+        tools,
+        8080,
+        '127.0.0.1',
+        openApiSpec,
+      );
+      expect(result, contains('const bool _logErrors = false;'));
+      expect(
+        result,
+        contains("'error': 'An error occurred while processing the request'"),
+      );
     });
   });
 }

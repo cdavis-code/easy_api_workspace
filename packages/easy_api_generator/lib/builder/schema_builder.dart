@@ -7,11 +7,9 @@
 ///
 /// All methods are static; the class is used purely as a namespace.
 class SchemaBuilder {
-  /// Creates a [SchemaBuilder].
-  ///
-  /// This class exposes only static helpers and is not meant to be
-  /// instantiated; the constructor exists for API completeness.
-  SchemaBuilder();
+  /// Private constructor — all operations are exposed as static helpers
+  /// and this class is not meant to be instantiated.
+  SchemaBuilder._();
 
   /// Converts a Dart type string to a `Schema.*` expression.
   static String fromType(String rawType) {

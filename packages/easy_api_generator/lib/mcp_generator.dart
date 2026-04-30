@@ -9,5 +9,3 @@
 library;
 
 export 'builder/mcp_builder.dart';
-
-// Note: Builder implementation uses local stubs

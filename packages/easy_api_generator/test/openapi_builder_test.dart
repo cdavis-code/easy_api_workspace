@@ -18,9 +18,9 @@ void main() {
         final spec = OpenApiBuilder.build(tools, 'http', 8080, '0.0.0.0');
 
         expect(spec['openapi'], equals('3.0.3'));
-        expect(spec['info'], isA<Map>());
-        expect(spec['paths'], isA<Map>());
-        expect(spec['servers'], isA<List>());
+        expect(spec['info'], isA<Map<String, Object?>>());
+        expect(spec['paths'], isA<Map<String, Object?>>());
+        expect(spec['servers'], isA<List<Object?>>());
       });
 
       test('generates correct server URL for HTTP transport', () {
@@ -497,6 +497,57 @@ void main() {
 
         final spec = OpenApiBuilder.build(tools, 'http', 8080, '0.0.0.0');
         expect(spec['paths']['/users']['post']['tags'], equals(['Users']));
+      });
+    });
+
+    group('sensitive parameters', () {
+      test(
+        'marks string body property as writeOnly + format password when @Parameter(sensitive: true)',
+        () {
+          final tools = <Map<String, dynamic>>[
+            {
+              'name': 'createUser',
+              'description': 'Create user',
+              'parameters': <Map<String, dynamic>>[
+                {
+                  'name': 'password',
+                  'type': 'String',
+                  'isOptional': false,
+                  'parameterMetadata': <String, dynamic>{'sensitive': true},
+                },
+              ],
+            },
+          ];
+
+          final spec = OpenApiBuilder.build(tools, 'http', 8080, '0.0.0.0');
+          final schema =
+              spec['paths']['/users']['post']['requestBody']['content']['application/json']['schema']['properties']['password']
+                  as Map<String, dynamic>;
+
+          expect(schema['writeOnly'], isTrue);
+          expect(schema['format'], equals('password'));
+          expect(schema['type'], equals('string'));
+        },
+      );
+
+      test('non-sensitive parameters do not gain writeOnly/format', () {
+        final tools = <Map<String, dynamic>>[
+          {
+            'name': 'createUser',
+            'description': 'Create user',
+            'parameters': <Map<String, dynamic>>[
+              {'name': 'name', 'type': 'String', 'isOptional': false},
+            ],
+          },
+        ];
+
+        final spec = OpenApiBuilder.build(tools, 'http', 8080, '0.0.0.0');
+        final schema =
+            spec['paths']['/users']['post']['requestBody']['content']['application/json']['schema']['properties']['name']
+                as Map<String, dynamic>;
+
+        expect(schema.containsKey('writeOnly'), isFalse);
+        expect(schema.containsKey('format'), isFalse);
       });
     });
   });

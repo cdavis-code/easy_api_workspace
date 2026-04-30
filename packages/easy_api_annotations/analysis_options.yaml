@@ -15,5 +15,3 @@ linter:
     - prefer_single_quotes
     - always_declare_return_types
     - always_use_package_imports
-    - avoid_catches_without_on_clauses
-    - unawaited_futures

@@ -4,11 +4,9 @@
 /// following API design best practices. It intelligently maps tool operations to
 /// standard HTTP methods and resource-based URL patterns.
 class OpenApiBuilder {
-  /// Creates an [OpenApiBuilder].
-  ///
-  /// All operations are exposed as static methods; the constructor exists
-  /// only for API completeness.
-  OpenApiBuilder();
+  /// Private constructor — all operations are exposed as static helpers
+  /// and this class is not meant to be instantiated.
+  OpenApiBuilder._();
 
   /// Generates an OpenAPI 3.0 specification from tool definitions.
   ///
@@ -566,6 +564,16 @@ class OpenApiBuilder {
       schema['enum'] = paramMetadata['enumValues'];
     }
 
+    // Mark sensitive parameters so API consumers know to mask them in UI/logs.
+    // Uses OpenAPI standard `writeOnly: true` + `format: 'password'` for strings.
+    final nested = paramMetadata['parameterMetadata'] as Map<String, dynamic>?;
+    if (nested != null && nested['sensitive'] == true) {
+      schema['writeOnly'] = true;
+      if (schema['type'] == 'string') {
+        schema['format'] = 'password';
+      }
+    }
+
     // Handle nullable types
     if (rawType.endsWith('?')) {
       schema['nullable'] = true;
@@ -632,10 +640,10 @@ class OpenApiBuilder {
       case 'bool':
         return false;
       case 'List':
-        return [];
+        return <Object?>[];
       case 'Map':
       case 'dynamic':
-        return {};
+        return <String, Object?>{};
       default:
         return null;
     }

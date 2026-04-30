@@ -125,7 +125,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] createUser: $e');
+        io.stderr.writeln('[easy_api] createUser: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -145,7 +145,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] getUserTodos: $e');
+        io.stderr.writeln('[easy_api] getUserTodos: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -165,7 +165,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] getUser: $e');
+        io.stderr.writeln('[easy_api] getUser: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -185,7 +185,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] listUsers: $e');
+        io.stderr.writeln('[easy_api] listUsers: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -205,7 +205,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] searchUsers: $e');
+        io.stderr.writeln('[easy_api] searchUsers: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -225,7 +225,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] createTodo: $e');
+        io.stderr.writeln('[easy_api] createTodo: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -245,7 +245,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] getTodo: $e');
+        io.stderr.writeln('[easy_api] getTodo: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -265,7 +265,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] listTodos: $e');
+        io.stderr.writeln('[easy_api] listTodos: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -285,7 +285,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] deleteTodo: $e');
+        io.stderr.writeln('[easy_api] deleteTodo: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -305,7 +305,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] completeTodo: $e');
+        io.stderr.writeln('[easy_api] completeTodo: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -326,7 +326,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] assignTodoToUser: $e');
+        io.stderr.writeln('[easy_api] assignTodoToUser: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -347,7 +347,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] removeTodoFromUser: $e');
+        io.stderr.writeln('[easy_api] removeTodoFromUser: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -367,7 +367,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] getTodosForUser: $e');
+        io.stderr.writeln('[easy_api] getTodosForUser: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -427,7 +427,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] _search: $e');
+        io.stderr.writeln('[easy_api] _search: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -478,7 +478,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_mcp] _execute: $e');
+        io.stderr.writeln('[easy_api] _execute: $e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -533,7 +533,7 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
               }));
             }).catchError((e, st) {
               if (_logErrors) {
-                io.stderr.writeln('[easy_mcp] _dispatchCodeModeToolCall($toolName): $e');
+                io.stderr.writeln('[easy_api] _dispatchCodeModeToolCall($toolName): $e');
                 io.stderr.writeln(st);
                 io.stderr.flush();  // fire-and-forget; callback is not async
               }

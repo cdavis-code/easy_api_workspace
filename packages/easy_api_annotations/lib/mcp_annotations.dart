@@ -4,6 +4,8 @@
 /// Model Context Protocol (MCP) server.
 library;
 
+import 'package:meta/meta.dart';
+
 /// Transport protocol options for MCP servers.
 ///
 /// Determines how the generated MCP server will communicate with clients.
@@ -41,7 +43,7 @@ enum McpTransport {
 ///
 /// The [address] parameter specifies the bind address for HTTP transport.
 /// Only used when [transport] is [McpTransport.http].
-/// Defaults to 'localhost'. Use '0.0.0.0' to listen on all interfaces.
+/// Defaults to '127.0.0.1'. Use '0.0.0.0' to listen on all interfaces.
 ///
 /// The [toolPrefix] parameter adds a prefix to all tool names in this
 /// scope. Useful for organizing tools by domain or avoiding naming
@@ -78,6 +80,35 @@ enum McpTransport {
 ///   Future<User> createUser() async { ... }  // Tool name: UserService_createUser
 /// }
 /// ```
+///
+/// Tool-naming resolution order (applied in sequence):
+/// 1. Base name — either [Tool.name] if provided, otherwise the Dart method name.
+/// 2. Auto class prefix — if [autoClassPrefix] is `true` and the method lives
+///    in a class, prepend `ClassName_`.
+/// 3. Server tool prefix — if [toolPrefix] is set, prepend it last.
+///
+/// Combined example showing all three options together:
+/// ```dart
+/// @Server(
+///   transport: McpTransport.stdio,
+///   autoClassPrefix: true,
+///   toolPrefix: 'api_',
+/// )
+/// class UserService {
+///   // Base:  'createUser'       (Dart method name)
+///   // Step 2: 'UserService_createUser'   (+ autoClassPrefix)
+///   // Step 3: 'api_UserService_createUser' (+ toolPrefix)  ← final tool name
+///   @Tool(description: 'Create user')
+///   Future<User> createUser() async { ... }
+///
+///   // Base:  'user_make'        (from @Tool.name, overrides method name)
+///   // Step 2: 'UserService_user_make'
+///   // Step 3: 'api_UserService_user_make'                 ← final tool name
+///   @Tool(name: 'user_make', description: 'Create user (custom name)')
+///   Future<User> createUserCustom() async { ... }
+/// }
+/// ```
+@immutable
 class Server {
   /// The transport protocol used by the generated MCP server.
   ///
@@ -265,6 +296,7 @@ typedef Mcp = Server;
 ///   // Implementation
 /// }
 /// ```
+@immutable
 class Tool {
   /// Optional custom name for this tool.
   ///
@@ -284,13 +316,6 @@ class Tool {
   /// These icons may be displayed by MCP clients to visually identify
   /// the tool. Supported formats depend on the client.
   final List<String>? icons;
-
-  /// Deprecated: Execution metadata will be supported in a future version.
-  ///
-  /// Currently ignored. Reserved for future use to specify execution
-  /// parameters like timeouts and resource limits.
-  @Deprecated('Will be implemented in future version')
-  final Map<String, Object?>? execution;
 
   /// Whether this tool should be available in code mode.
   ///
@@ -348,7 +373,6 @@ class Tool {
   /// [name] - Optional custom tool name (defaults to method name).
   /// [description] - Human-readable description of the tool's purpose.
   /// [icons] - Optional list of icon URLs for visual identification.
-  /// [execution] - Deprecated, will be implemented in a future version.
   /// [codeMode] - Whether this tool is available in the code mode sandbox
   ///   (default: true).
   /// [codeModeVisible] - Whether this tool remains listed in `tools/list`
@@ -357,7 +381,6 @@ class Tool {
     this.name,
     this.description,
     this.icons,
-    this.execution,
     this.codeMode = true,
     this.codeModeVisible = false,
   });
@@ -396,6 +419,7 @@ class Tool {
 ///   int? age,
 /// }) async { ... }
 /// ```
+@immutable
 class Parameter {
   /// Custom name for this parameter in generated REST APIs, MCP tool schemas,
   /// and OpenAPI specifications.
@@ -447,8 +471,16 @@ class Parameter {
 
   /// Whether this parameter should be marked as sensitive.
   ///
-  /// Sensitive parameters (like passwords, API keys) may be masked
-  /// in logs and UI by MCP clients.
+  /// Sensitive parameters (like passwords, API keys) are surfaced to downstream
+  /// tooling so it can mask values in UIs and logs. When `sensitive: true`:
+  ///
+  /// - `.mcp.json` inputSchema adds `"x-sensitive": true` on the property
+  ///   (plus `"format": "password"` for string types).
+  /// - `.openapi.json` adds `writeOnly: true` on the schema
+  ///   (plus `format: 'password'` for string types), following OpenAPI 3.0
+  ///   conventions for secrets.
+  ///
+  /// MCP clients and OpenAPI UIs may use these markers to hide the value.
   final bool sensitive;
 
   /// Allowed values for enum-like parameters.
