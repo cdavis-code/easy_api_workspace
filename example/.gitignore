@@ -1,6 +1,8 @@
 *.json
 
 bin/example.mcp.dart
-bin/example.stdio.mcp.dart
+bin/example.mcp.json
+bin/example.openapi.dart
+bin/example.openapi.json
 
 build.yaml

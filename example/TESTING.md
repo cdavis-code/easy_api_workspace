@@ -343,10 +343,10 @@ cd example
 dart run bin/example.openapi.dart
 ```
 
-The server will start on the configured address and port (default: `http://127.0.0.1:3000`). You should see output like:
+The server binds to the `address` and `port` configured on the `@Server` annotation. The bundled [bin/example.dart](bin/example.dart) uses `port: 8080, address: '0.0.0.0'`, so the REST server is reachable at `http://127.0.0.1:8080` (or any interface on the host). You should see output like:
 
 ```
-REST API server running on http://127.0.0.1:3000
+REST API server running on http://0.0.0.0:8080
 ```
 
 ### Testing REST Endpoints
@@ -355,36 +355,36 @@ REST API server running on http://127.0.0.1:3000
 
 **List all users:**
 ```bash
-curl -X GET http://127.0.0.1:3000/users
+curl -X GET http://127.0.0.1:8080/users
 ```
 
 **Create a new user:**
 ```bash
-curl -X POST http://127.0.0.1:3000/users \
+curl -X POST http://127.0.0.1:8080/users \
   -H "Content-Type: application/json" \
   -d '{"name": "John Doe", "email": "john@example.com"}'
 ```
 
 **Get a specific user:**
 ```bash
-curl -X GET http://127.0.0.1:3000/users/1
+curl -X GET http://127.0.0.1:8080/users/1
 ```
 
 **List all todos:**
 ```bash
-curl -X GET http://127.0.0.1:3000/todos
+curl -X GET http://127.0.0.1:8080/todos
 ```
 
 **Create a new todo:**
 ```bash
-curl -X POST http://127.0.0.1:3000/todos \
+curl -X POST http://127.0.0.1:8080/todos \
   -H "Content-Type: application/json" \
   -d '{"title": "Test REST API"}'
 ```
 
 **Assign a todo to a user:**
 ```bash
-curl -X POST http://127.0.0.1:3000/todos/1/assign/1
+curl -X POST http://127.0.0.1:8080/todos/1/assign/1
 ```
 
 #### Using HTTPie (Alternative to curl)
@@ -396,10 +396,10 @@ brew install httpie  # macOS
 sudo apt install httpie  # Ubuntu/Debian
 
 # List users
-http GET http://127.0.0.1:3000/users
+http GET http://127.0.0.1:8080/users
 
 # Create user
-http POST http://127.0.0.1:3000/users name="Jane Smith" email="jane@example.com"
+http POST http://127.0.0.1:8080/users name="Jane Smith" email="jane@example.com"
 ```
 
 #### Using a GUI HTTP Client
@@ -464,10 +464,10 @@ Always include `Content-Type: application/json` for POST/PUT/PATCH requests:
 
 ```bash
 # ❌ Will fail
-curl -X POST http://127.0.0.1:3000/users -d '{"name": "Test"}'
+curl -X POST http://127.0.0.1:8080/users -d '{"name": "Test"}'
 
 # ✅ Correct
-curl -X POST http://127.0.0.1:3000/users \
+curl -X POST http://127.0.0.1:8080/users \
   -H "Content-Type: application/json" \
   -d '{"name": "Test"}'
 ```
@@ -503,7 +503,7 @@ Save this as `test_rest_api.sh` for quick validation:
 ```bash
 #!/bin/bash
 
-BASE_URL="http://127.0.0.1:3000"
+BASE_URL="http://127.0.0.1:8080"
 
 echo "=== Testing REST API ==="
 
@@ -536,15 +536,15 @@ chmod +x test_rest_api.sh
 ## Troubleshooting
 
 ### REST API server won't start
-- Ensure no other process is using the configured port (default: 3000)
+- Ensure no other process is using the configured port (the bundled example uses `8080`)
 - Check the `@Server` annotation for correct `port` and `address` values
 - Verify Dart SDK version: `dart --version`
 - Regenerate the server: `dart run build_runner build --delete-conflicting-outputs`
 
 ### Port already in use
 ```bash
-# Find process using port 3000
-lsof -i :3000
+# Find process using port 8080
+lsof -i :8080
 
 # Kill the process (replace PID)
 kill -9 <PID>

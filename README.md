@@ -76,6 +76,10 @@ example/
 - **Both MCP + REST** (`generateMcp: true, generateRest: true`): Serve both AI agents and traditional clients from the same annotated code
 - **Metadata Export** (`generateJson: true`): Share tool specifications with team members or use in CI/CD pipelines
 
+### Known Caveats
+
+- **HTTP MCP transport — SSE keepalive buffering.** When `@Server(transport: McpTransport.http)` is used, the generated `.mcp.dart` exposes a Streamable-HTTP compliant endpoint (`GET` opens an SSE channel, `POST` handles JSON-RPC requests, `DELETE` terminates a session, `OPTIONS` returns CORS preflight). The HTTP response **headers** (`200 OK` + `Content-Type: text/event-stream`) flush immediately, which is what MCP clients rely on to accept the transport during the handshake. However, `dart:io`'s `HttpResponse` buffers small chunked writes, so the periodic keepalive comments (`: keepalive\n\n`, every 15s) may not be visible to raw tools like `curl -N` for several seconds. This does **not** affect correctness — all JSON-RPC request/response traffic flows normally over `POST`. If you need faster server-push flushing (for example, server-initiated tool notifications), pad the first SSE event with ~4 KiB of comment bytes or drop down to a raw `dart:io` `HttpServer` that calls `response.flush()` after each write.
+
 ## Table of Contents
 
 - [Overview](#overview)

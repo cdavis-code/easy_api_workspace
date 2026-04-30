@@ -1,7 +1,7 @@
 # MCP Example
 
 <p align="center">
-  <img src="../images/logo-banner.svg" width="400" alt="easy_api">
+  <img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/images/logo-banner.svg" width="400" alt="easy_api">
 </p>
 
 Example demonstrating how to use `easy_api_annotations` and `easy_api_generator`. This example showcases a realistic many-to-many domain model where **Users** and **Todos** have bidirectional relationships — a todo can be assigned to multiple users, and a user can have multiple todos.
@@ -14,6 +14,11 @@ Example demonstrating how to use `easy_api_annotations` and `easy_api_generator`
 - [Available Tools](#available-tools)
 - [Code Mode](#code-mode)
 - [Testing & Validation](#testing--validation)
+  - [MCP Inspector (Recommended)](#1-mcp-inspector-recommended)
+  - [MCP Inspector CLI Mode](#2-mcp-inspector-cli-mode)
+  - [Manual curl Testing](#3-manual-curl-testing)
+  - [stdio Pipe Testing](#4-stdio-pipe-testing)
+  - [REST API Testing](#5-rest-api-testing)
 - [Generated Artifacts](#generated-artifacts)
 - [Project Structure](#project-structure)
 - [Data Model](#data-model)
@@ -170,27 +175,28 @@ dart run build_runner build --delete-conflicting-outputs
 dart run build_runner build --delete-conflicting-outputs --watch
 ```
 
-This generates:
-- `bin/example.mcp.dart` — Generated HTTP MCP server
-- `bin/example.stdio.mcp.dart` — Generated stdio MCP server
-- `bin/example.mcp.json` — Tool metadata (JSON format)
-- `bin/example.openapi.json` — OpenAPI 3.0 specification
-- `bin/example.stdio.mcp.json` — Tool metadata for stdio version
-- `bin/example.stdio.openapi.json` — OpenAPI 3.0 spec for stdio version
+For the sample code above (`@Server(transport: McpTransport.stdio)` in `bin/example.dart`), this generates a single file:
+
+- `bin/example.mcp.dart` — Generated stdio MCP server
+
+No `.mcp.json` or `.openapi.json` is produced because `generateJson` and `generateRest` both default to `false`. Enable them on the `@Server` annotation (`generateJson: true`, `generateRest: true`) if you want those metadata artifacts.
 
 The generator discovers all `@Tool`-annotated methods from libraries imported by the `@Server`-annotated entry point and registers them in a single MCP server.
 
 ### 3. Run the server
 
-**stdio Transport (Recommended for Testing):**
+**stdio Transport (used by [bin/example.dart](bin/example.dart)):**
 ```bash
-dart run example/bin/example.stdio.mcp.dart
+dart run example/bin/example.mcp.dart
 ```
 
 **HTTP Transport:**
+
+To produce an HTTP server, change `transport: McpTransport.stdio` to `McpTransport.http` in `bin/example.dart` (adjusting `port` / `address` as needed), re-run `build_runner`, then:
+
 ```bash
 dart run example/bin/example.mcp.dart
-# Server listens on http://0.0.0.0:8080
+# Server listens on http://<address>:<port>
 ```
 
 ## Available Tools
@@ -255,7 +261,7 @@ This example supports **two transport protocols** for MCP communication:
 
 **Run:**
 ```bash
-dart run example/bin/example.stdio.mcp.dart
+dart run example/bin/example.mcp.dart
 ```
 
 ### HTTP Transport
@@ -435,76 +441,42 @@ This will:
 
 **List available tools:**
 ```bash
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/list
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/list
 ```
 
 **Call individual tools:**
 ```bash
 # UserStore tools
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name listUsers
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name listUsers
 
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name createUser --tool-arg 'name=Test User' --tool-arg 'email=test@example.com'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name createUser --tool-arg 'name=Test User' --tool-arg 'email=test@example.com'
 
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name getUser --tool-arg 'id=1'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name getUser --tool-arg 'id=1'
 
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name searchUsers --tool-arg 'query=Alice'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name searchUsers --tool-arg 'query=Alice'
 
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name getUserTodos --tool-arg 'userId=1'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name getUserTodos --tool-arg 'userId=1'
 
 # TodoStore tools
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name createTodo --tool-arg 'title=Buy groceries'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name createTodo --tool-arg 'title=Buy groceries'
 
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name listTodos
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name listTodos
 
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name completeTodo --tool-arg 'id=1'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name completeTodo --tool-arg 'id=1'
 
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name assignTodoToUser --tool-arg 'todoId=1' --tool-arg 'userId=1'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name assignTodoToUser --tool-arg 'todoId=1' --tool-arg 'userId=1'
 
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name removeTodoFromUser --tool-arg 'todoId=1' --tool-arg 'userId=1'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name removeTodoFromUser --tool-arg 'todoId=1' --tool-arg 'userId=1'
 
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name getTodosForUser --tool-arg 'userId=1'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name getTodosForUser --tool-arg 'userId=1'
 
 # Code Mode tools
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name search --tool-arg 'query=user create' --tool-arg 'detail_level=detailed'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name search --tool-arg 'query=user create' --tool-arg 'detail_level=detailed'
 
-npx @modelcontextprotocol/inspector --cli dart run example/bin/example.stdio.mcp.dart --method tools/call --tool-name execute --tool-arg 'code=const users = await external_listUsers({}); `Found ${users.length} users`'
+npx @modelcontextprotocol/inspector --cli dart run example/bin/example.mcp.dart --method tools/call --tool-name execute --tool-arg 'code=const users = await external_listUsers({}); `Found ${users.length} users`'
 ```
 
-### 3. Bash Test Script
-
-**Best for**: Automated testing, HTTP transport validation
-
-**Run:**
-```bash
-cd example
-./test_code_mode.sh
-```
-
-**What It Tests:**
-- ✅ MCP protocol initialization handshake
-- ✅ Tool listing
-- ✅ Individual tool calls
-- ✅ Code mode sequential execution
-- ✅ Code mode parallel execution
-- ✅ Full workflow orchestration
-
-### 4. Node.js Test Client
-
-**Best for**: Programmatic testing, custom test scenarios
-
-**Run:**
-```bash
-cd example
-node test_mcp_http.js
-```
-
-**What It Tests:**
-- ✅ HTTP transport communication
-- ✅ Full MCP protocol sequence
-- ✅ Tool execution via HTTP
-- ✅ Error handling and timeouts
-
-### 5. Manual curl Testing
+### 3. Manual curl Testing
 
 **Best for**: Low-level protocol validation, debugging
 
@@ -548,7 +520,7 @@ curl -s -X POST http://localhost:8080 \
   }' | jq .
 ```
 
-### 6. stdio Pipe Testing
+### 4. stdio Pipe Testing
 
 **Best for**: Validating stdio protocol, automated testing
 
@@ -558,7 +530,7 @@ curl -s -X POST http://localhost:8080 \
   echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
   echo '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   echo '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
-} | dart run bin/example.stdio.mcp.dart 2>/dev/null | \
+} | dart run bin/example.mcp.dart 2>/dev/null | \
   grep -A 100 '"id":2' | \
   jq '.result.tools[] | .name'
 
@@ -580,6 +552,44 @@ curl -s -X POST http://localhost:8080 \
 # "execute_code"
 # "search"
 ```
+
+### 5. REST API Testing
+
+**Best for**: Testing the generated Shelf-based REST server ([bin/example.openapi.dart](bin/example.openapi.dart)) — this is a separate server from the MCP server, produced when `@Server(generateRest: true)` is set.
+
+**Run the REST server:**
+```bash
+dart run example/bin/example.openapi.dart
+# Binds to http://0.0.0.0:8080 using the `port` and `address` from the @Server annotation
+```
+
+**Call endpoints with curl:**
+```bash
+# List users
+curl -s http://localhost:8080/users | jq .
+
+# Create a user
+curl -s -X POST http://localhost:8080/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Jane Doe","email":"jane@example.com"}' | jq .
+
+# Get a user by id
+curl -s http://localhost:8080/users/1 | jq .
+
+# Search users
+curl -s 'http://localhost:8080/users/search?query=Alice' | jq .
+
+# List / create / delete todos
+curl -s http://localhost:8080/todos | jq .
+curl -s -X POST http://localhost:8080/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Buy groceries"}' | jq .
+curl -s -X DELETE http://localhost:8080/todos/1
+```
+
+**Inspect the full contract** — the complete list of routes, request/response schemas, and validation rules lives in [bin/example.openapi.json](bin/example.openapi.json). Import it into Swagger UI, Postman, Insomnia, or Redoc for interactive exploration and client-code generation.
+
+**See** [TESTING.md § Testing REST API Servers](TESTING.md#testing-rest-api-servers) for detailed walkthroughs including HTTPie, GUI HTTP clients, OpenAPI-spec verification, MCP-vs-REST comparison, and common considerations (Content-Type headers, CORS, error handling, shared data persistence with the MCP server).
 
 ### Testing Checklist
 
@@ -636,40 +646,34 @@ curl -s -X POST http://localhost:8080 \
 
 ## 📦 Generated Artifacts
 
-After running `build_runner`, the following files are generated:
+Running `dart run build_runner build --delete-conflicting-outputs` from the project root uses the single source entry point shipped with this example ([bin/example.dart](bin/example.dart), configured with `McpTransport.stdio`, `generateJson: true`, `generateMcp: true`, `generateRest: true`) and produces exactly **four** files:
 
 ### Server Files
-- **`example.mcp.dart`** - HTTP MCP server (27.5KB)
-  - Shelf-based HTTP server
-  - Port: 8080, Address: 0.0.0.0
-  - Full code mode support
-  
-- **`example.stdio.mcp.dart`** - stdio MCP server (26.1KB)
-  - JSON-RPC over stdin/stdout
-  - Full code mode support
-  - Recommended for testing
+- **`example.mcp.dart`** — stdio MCP server
+  - JSON-RPC 2.0 over stdin/stdout
+  - Full code mode support (when `codeMode: true`)
 
 ### Metadata Files
-- **`example.mcp.json`** - Tool metadata for HTTP server
-  - JSON format tool descriptions
+- **`example.mcp.json`** — MCP tool metadata
+  - Machine-readable tool descriptions
   - Parameter schemas
   - Tool capabilities
-  
-- **`example.stdio.mcp.json`** - Tool metadata for stdio server
-  - Same format as HTTP version
 
-### OpenAPI Specifications
-- **`example.openapi.json`** - OpenAPI 3.0 spec for HTTP server
+### OpenAPI / REST
+- **`example.openapi.dart`** — REST API server implementation (Shelf-based)
+  - Serves the endpoints described in `example.openapi.json`
+- **`example.openapi.json`** — OpenAPI 3.0 specification
   - RESTful API documentation
   - Request/response schemas
-  - Can be used with Swagger UI
-  
-- **`example.stdio.openapi.json`** - OpenAPI 3.0 spec for stdio server
-  - Same format as HTTP version
+  - Can be used with Swagger UI, client generators, and API gateways
+
+### Optional: a second entry point for a different transport
+
+If you want **both** a stdio server and an HTTP server side-by-side, add a second annotated source file — for example `bin/example.http.dart` with `@Server(transport: McpTransport.http, …)` — and re-run `build_runner`. `build_runner` names outputs after the input stem, so that would yield `bin/example.http.mcp.dart` (plus `.mcp.json`, `.openapi.dart`, `.openapi.json` if enabled) alongside the existing `bin/example.mcp.dart`. No `build.yaml` customisation is required.
 
 ### Generated Code Features
 
-Both server files include:
+The generated `.mcp.dart` server includes:
 - 15 tool registrations with JSON schemas
 - Tool execution handlers with error handling
 - Result serialization logic
@@ -714,14 +718,11 @@ This launches the interactive web UI at `http://localhost:6274` where you can:
 ```
 example/
 ├── bin/
-│   ├── example.dart                  # Entry point with @Server (HTTP transport)
-│   ├── example.mcp.dart              # Generated HTTP MCP server
-│   ├── example.mcp.json              # Tool metadata (HTTP)
-│   ├── example.openapi.json          # OpenAPI 3.0 spec (HTTP)
-│   ├── example.stdio.dart            # Entry point with @Server (stdio transport)
-│   ├── example.stdio.mcp.dart        # Generated stdio MCP server
-│   ├── example.stdio.mcp.json        # Tool metadata (stdio)
-│   └── example.stdio.openapi.json    # OpenAPI 3.0 spec (stdio)
+│   ├── example.dart                  # Entry point with @Server (stdio transport)
+│   ├── example.mcp.dart              # Generated stdio MCP server
+│   ├── example.mcp.json              # Generated MCP tool metadata
+│   ├── example.openapi.dart          # Generated REST API server (Shelf)
+│   └── example.openapi.json          # Generated OpenAPI 3.0 spec
 ├── lib/
 │   └── src/
 │       ├── todo.dart                  # Todo model
@@ -730,8 +731,6 @@ example/
 │       └── user_store.dart            # UserStore with @Tool methods
 ├── build.yaml                         # Build runner configuration
 ├── launch_inspector.sh                # MCP Inspector launcher script
-├── test_code_mode.sh                  # Bash test script for HTTP transport
-├── test_mcp_http.js                   # Node.js test client for HTTP transport
 ├── TESTING.md                         # Comprehensive testing guide with MCP Inspector
 ├── README.md                          # This file
 └── pubspec.yaml                       # Package dependencies
@@ -915,10 +914,9 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
 |----------|----------|-----------|------------|
 | **MCP Inspector (Web UI)** | Interactive testing, exploring | stdio | Manual |
 | **MCP Inspector (CLI)** | Scripting, CI/CD | stdio | Automated |
-| **Bash Script** | HTTP validation | HTTP | Automated |
-| **Node.js Client** | Programmatic testing | HTTP | Automated |
-| **curl Commands** | Low-level validation | HTTP | Manual/Automated |
-| **stdio Pipes** | Protocol validation | stdio | Automated |
+| **curl Commands (MCP)** | Low-level MCP protocol validation | HTTP | Manual/Automated |
+| **stdio Pipes** | MCP protocol validation | stdio | Automated |
+| **curl Commands (REST)** | Verifying `example.openapi.dart` endpoints | HTTP (REST) | Manual/Automated |
 
 ### Documentation Files
 
@@ -932,18 +930,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
 cd example
 ./launch_inspector.sh
 
-# Run automated tests
-cd example
-./test_code_mode.sh
-node test_mcp_http.js
-
 # Regenerate servers
 cd ..
 dart run build_runner build --delete-conflicting-outputs
 
-# Run servers directly
-dart run example/bin/example.stdio.mcp.dart  # stdio
-dart run example/bin/example.mcp.dart         # HTTP
+# Run the MCP server directly
+dart run example/bin/example.mcp.dart
+
+# Run the generated REST API server (binds to 0.0.0.0:8080)
+dart run example/bin/example.openapi.dart
 ```
 
 ---

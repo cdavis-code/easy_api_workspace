@@ -36,11 +36,11 @@ echo ""
 echo "Testing instructions:"
 echo "  1. The server should auto-connect with stdio transport"
 echo "  2. If not, verify Command: dart"
-echo "  3. Arguments: run bin/example.stdio.mcp.dart"
+echo "  3. Arguments: run bin/example.mcp.dart"
 echo "  4. Navigate to the 'Tools' tab to see all available tools"
 echo "  5. Test 'execute_code' to try code mode!"
 echo ""
 
 # Launch MCP Inspector
 cd "$SCRIPT_DIR"
-npx -y @modelcontextprotocol/inspector dart run bin/example.stdio.mcp.dart
+npx -y @modelcontextprotocol/inspector dart run bin/example.mcp.dart

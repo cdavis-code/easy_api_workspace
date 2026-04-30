@@ -27,20 +27,107 @@ Future<void> main() async {
 
   final server = MCPServerWithTools(channel);
 
-  // Buffer responses from the MCP server using a queue of completers
+  // FIFO of completers awaiting responses for in-flight POST requests.
   final responseQueue = <Completer<String>>[];
+  // Active SSE subscribers (Streamable-HTTP GET streams).
+  final sseSinks = <StreamController<List<int>>>{};
+
   serverToClient.stream.listen((response) {
     if (responseQueue.isNotEmpty) {
       responseQueue.removeAt(0).complete(response);
+      return;
+    }
+    // Fan out unsolicited server→client messages to any open SSE streams.
+    final bytes = utf8.encode('event: message\ndata: $response\n\n');
+    for (final sink in sseSinks) {
+      if (!sink.isClosed) sink.add(bytes);
     }
   });
 
+  const corsHeaders = <String, String>{
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers':
+        'Content-Type, Accept, Mcp-Session-Id, Authorization',
+    'Access-Control-Expose-Headers': 'Mcp-Session-Id',
+  };
+
+  bool containsRequest(dynamic m) {
+    if (m is List) return m.any(containsRequest);
+    if (m is Map) return m.containsKey('id') && m.containsKey('method');
+    return false;
+  }
+
   Future<shelf.Response> handleRequest(shelf.Request request) async {
-    if (request.method != 'POST') {
-      return shelf.Response(405, body: 'Method not allowed');
+    final method = request.method;
+
+    // CORS preflight.
+    if (method == 'OPTIONS') {
+      return shelf.Response(204, headers: corsHeaders);
+    }
+
+    // Streamable-HTTP server→client SSE stream.
+    if (method == 'GET') {
+      final controller = StreamController<List<int>>();
+      sseSinks.add(controller);
+      controller.add(utf8.encode(': ok\n\n'));
+      final keepalive = Timer.periodic(const Duration(seconds: 15), (t) {
+        if (controller.isClosed) {
+          t.cancel();
+        } else {
+          controller.add(utf8.encode(': keepalive\n\n'));
+        }
+      });
+      controller.onCancel = () {
+        keepalive.cancel();
+        sseSinks.remove(controller);
+        controller.close();
+      };
+      return shelf.Response.ok(
+        controller.stream,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no',
+          ...corsHeaders,
+        },
+      );
+    }
+
+    // Session termination.
+    if (method == 'DELETE') {
+      return shelf.Response.ok('', headers: corsHeaders);
+    }
+
+    if (method != 'POST') {
+      return shelf.Response(
+        405,
+        body: 'Method not allowed',
+        headers: corsHeaders,
+      );
     }
 
     final body = await request.readAsString();
+
+    dynamic parsed;
+    try {
+      parsed = jsonDecode(body);
+    } catch (_) {
+      return shelf.Response(
+        400,
+        body:
+            '{"jsonrpc":"2.0","error":{"code":-32700,"message":"Parse error"},"id":null}',
+        headers: {'Content-Type': 'application/json', ...corsHeaders},
+      );
+    }
+
+    // Notification / response-only batches: accept and acknowledge.
+    if (!containsRequest(parsed)) {
+      clientToServer.add(body);
+      return shelf.Response(202, headers: corsHeaders);
+    }
+
     final completer = Completer<String>();
     responseQueue.add(completer);
     clientToServer.add(body);
@@ -48,7 +135,7 @@ Future<void> main() async {
     final response = await completer.future;
     return shelf.Response.ok(
       response,
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', ...corsHeaders},
     );
   }
 
@@ -65,6 +152,9 @@ Future<void> main() async {
   await httpServer.close();
   await clientToServer.close();
   await serverToClient.close();
+  for (final sink in sseSinks) {
+    await sink.close();
+  }
 }
 
 base class MCPServerWithTools extends MCPServer with ToolsSupport {
