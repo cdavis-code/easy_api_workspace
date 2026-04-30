@@ -211,7 +211,7 @@ class UserService {
 }
 ```
 
-See the [example](https://github.com/faithoflifedev/easy_api_workspace/tree/main/example) directory in the workspace root for a complete working example that demonstrates usage of both packages together.
+See the [example](https://github.com/cdavis-code/easy_api_workspace/tree/main/example) directory in the workspace root for a complete working example that demonstrates usage of both packages together.
 
 ## Features
 
@@ -220,16 +220,16 @@ See the [example](https://github.com/faithoflifedev/easy_api_workspace/tree/main
 - Support for both stdio (JSON-RPC) and HTTP transports
 - **Configurable HTTP server** — customize port and bind address
 - **REST + OpenAPI 3.0 generation** via `generateRest: true` (independent of MCP generation)
-- **[Code Mode](https://github.com/faithoflifedev/easy_api_workspace/blob/main/README.md#code-mode)** — optional Node.js sandbox for batch tool orchestration with per-tool opt-out
+- **[Code Mode](https://github.com/cdavis-code/easy_api_workspace/blob/main/README.md#code-mode)** — optional Node.js sandbox for batch tool orchestration with per-tool opt-out
 - **Rich parameter metadata** — titles, descriptions, examples, validation (min/max, pattern, enum), sensitivity flags, and external name aliases
 - **Flexible tool naming** — custom names, class-based auto prefixing, and tool prefixes
 - Backward-compatible `@Mcp` typedef for existing codebases
 - Compatible with `easy_api_generator` for automatic server code generation
-- Null safety compatible (Dart 3.11+)
+- Null safety compatible (Dart 3.9+)
 
 ## Contributing
 
-Contributions are welcome! Please read the [CONTRIBUTING.md](https://github.com/faithoflifedev/easy_api_workspace/blob/main/CONTRIBUTING.md) guide at the root of the workspace for setup instructions, development workflow, coding standards, testing expectations, and the pull-request checklist before opening a PR.
+Contributions are welcome! Please read the [CONTRIBUTING.md](https://github.com/cdavis-code/easy_api_workspace/blob/main/CONTRIBUTING.md) guide at the root of the workspace for setup instructions, development workflow, coding standards, testing expectations, and the pull-request checklist before opening a PR.
 
 ## License
 
