@@ -2,35 +2,36 @@
   <!-- Background -->
   <rect x="0" y="0" width="600" height="120" fill="#0175C2" rx="12"/>
   
-  <!-- Logo Icon -->
-  <g transform="translate(30, 20)">
-    <circle cx="40" cy="40" r="35" fill="white"/>
-    <circle cx="40" cy="40" r="30" fill="#0175C2"/>
-    <circle cx="40" cy="40" r="28" fill="none" stroke="#13B9FD" stroke-width="2"/>
-    
-    <!-- Code brackets -->
-    <g fill="white">
-      <path d="M25 28 L20 40 L25 52 L30 49 L26 40 L30 31 Z"/>
-      <path d="M55 28 L60 40 L55 52 L50 49 L54 40 L50 31 Z"/>
-    </g>
-    
-    <!-- easy text on top -->
-    <text x="40" y="40" font-family="Arial, sans-serif" font-size="10" font-weight="bold" 
-          fill="white" text-anchor="middle">easy</text>
-    
-    <!-- api text below -->
-    <text x="40" y="52" font-family="Arial, sans-serif" font-size="12" font-weight="bold" 
-          fill="#13B9FD" text-anchor="middle">api</text>
+  <!-- Logo Icon (embedded from logo-mark.svg, scaled 200→80) -->
+  <g transform="translate(30, 20) scale(0.4)">
+    <!-- Rounded tile background -->
+    <rect width="200" height="200" rx="36" ry="36" fill="#0175C2"/>
+
+    <!-- Left code bracket: < (code annotation accent) -->
+    <path d="M66 66 L40 100 L66 134"
+          fill="none" stroke="#FFFFFF" stroke-width="12"
+          stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Right code bracket: > (code annotation accent) -->
+    <path d="M134 66 L160 100 L134 134"
+          fill="none" stroke="#FFFFFF" stroke-width="12"
+          stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Interlocking chain links (API / server connectivity) -->
+    <circle cx="88" cy="100" r="14"
+            fill="none" stroke="#FFFFFF" stroke-width="7"/>
+    <circle cx="112" cy="100" r="14"
+            fill="none" stroke="#FFFFFF" stroke-width="7"/>
   </g>
   
   <!-- Project Name with easy on top, api below -->
   <text x="120" y="55" font-family="Arial, sans-serif" font-size="28" font-weight="bold" 
         fill="white">easy</text>
-  <text x="120" y="85" font-family="Arial, sans-serif" font-size="36" font-weight="bold" 
+  <text x="120" y="90" font-family="Arial, sans-serif" font-size="36" font-weight="bold" 
         fill="#13B9FD">api</text>
   
   <!-- Tagline -->
-  <text x="240" y="75" font-family="Arial, sans-serif" font-size="14" 
+  <text x="210" y="70" font-family="Arial, sans-serif" font-size="16" 
         fill="white" opacity="0.9">API and MCP Server Generation Made Easy</text>
   
   <!-- Decorative elements -->
