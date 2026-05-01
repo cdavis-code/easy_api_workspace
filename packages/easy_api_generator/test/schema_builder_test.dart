@@ -11,8 +11,27 @@ void main() {
       expect(SchemaBuilder.fromType('int'), equals('Schema.int()'));
     });
 
-    test('generates Schema.number() for double type', () {
-      expect(SchemaBuilder.fromType('double'), equals('Schema.number()'));
+    test('generates Schema.num() for double type', () {
+      expect(SchemaBuilder.fromType('double'), equals('Schema.num()'));
+    });
+
+    test('generates Schema.num() for nullable double type', () {
+      expect(SchemaBuilder.fromType('double?'), equals('Schema.num()'));
+    });
+
+    test('generates Schema.num() for num type', () {
+      expect(SchemaBuilder.fromType('num'), equals('Schema.num()'));
+    });
+
+    test('generates Schema.num() for nullable num type', () {
+      expect(SchemaBuilder.fromType('num?'), equals('Schema.num()'));
+    });
+
+    test('fromSchemaMap emits Schema.num() for JSON-Schema number', () {
+      expect(
+        SchemaBuilder.fromSchemaMap({'type': 'number'}),
+        equals('Schema.num()'),
+      );
     });
 
     test('generates Schema.bool() for bool type', () {

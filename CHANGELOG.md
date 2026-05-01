@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - Unreleased
+
+### Fixed
+- Schema code generation for `double`/`num` parameters now emits `Schema.num(...)` to match `dart_mcp` ≥ 0.5.0 (previously emitted non-existent `Schema.number(...)`).
+
 ## [0.6.0] - Unreleased
 
 ### Changed

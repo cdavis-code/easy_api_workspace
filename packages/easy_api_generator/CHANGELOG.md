@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-05-01
+
+### Fixed
+- Schema code generation for `double`/`num` parameters now emits `Schema.num(...)` to match `dart_mcp` ≥ 0.5.0 (previously emitted non-existent `Schema.number(...)`, which caused `Error: Member not found: 'Schema.number'` at compile time in generated `.mcp.dart` files). Also added a dedicated `'num'` case to `SchemaBuilder.fromType` and updated `fromSchemaMap` plus the `_applyMetadataToSchema` regex accordingly.
+
 ## [0.6.0] - 2026-04-30
 
 ### Added

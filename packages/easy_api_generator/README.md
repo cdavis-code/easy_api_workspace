@@ -24,7 +24,7 @@ dependencies:
 
 dev_dependencies:
   build_runner: ^2.4.0
-  easy_api_generator: ^0.6.0
+  easy_api_generator: ^0.6.1
 ```
 
 ## Usage

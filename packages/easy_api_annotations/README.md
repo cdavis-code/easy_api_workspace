@@ -24,7 +24,7 @@ dependencies:
 
 dev_dependencies:
   build_runner: ^2.4.0
-  easy_api_generator: ^0.6.0
+  easy_api_generator: ^0.6.1
 ```
 
 > **Note:** This package provides only the annotations. You also need [`easy_api_generator`](https://pub.dev/packages/easy_api_generator) to generate the MCP server code from your annotated classes.

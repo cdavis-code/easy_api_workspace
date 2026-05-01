@@ -29,7 +29,9 @@ class SchemaBuilder {
       case 'int':
         return 'Schema.int()';
       case 'double':
-        return 'Schema.number()';
+        return 'Schema.num()';
+      case 'num':
+        return 'Schema.num()';
       case 'bool':
         return 'Schema.bool()';
       default:
@@ -46,7 +48,7 @@ class SchemaBuilder {
       case 'integer':
         return 'Schema.int()';
       case 'number':
-        return 'Schema.number()';
+        return 'Schema.num()';
       case 'boolean':
         return 'Schema.bool()';
       case 'array':
@@ -126,7 +128,7 @@ class SchemaBuilder {
   }
 
   /// Applies @Parameter metadata to enhance a schema expression.
-  /// Only applies to simple primitive schemas (string, int, number, bool).
+  /// Only applies to simple primitive schemas (string, int, num, bool).
   /// Complex schemas (objects, lists) are returned unchanged.
   static String _applyMetadataToSchema(
     String baseSchema,
@@ -135,7 +137,7 @@ class SchemaBuilder {
     // Only support augmenting simple primitive schemas for now
     // Complex schemas (objects, lists with arguments) are returned unchanged
     final match = RegExp(
-      r'^Schema\.(string|int|number|bool)\(\)$',
+      r'^Schema\.(string|int|num|bool)\(\)$',
     ).firstMatch(baseSchema.trim());
     if (match == null) {
       // Complex schemas keep their original structure
