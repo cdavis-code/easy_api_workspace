@@ -236,6 +236,41 @@ class Server {
   /// Defaults to false.
   final bool logErrors;
 
+  /// Server-wide default values for tool annotation hints.
+  ///
+  /// When set, the 4 boolean hints ([ToolAnnotations.readOnlyHint],
+  /// [ToolAnnotations.destructiveHint], [ToolAnnotations.idempotentHint],
+  /// [ToolAnnotations.openWorldHint]) are applied as defaults to every
+  /// generated tool. Individual tools can override any hint via their own
+  /// `@Tool(annotations: ToolAnnotations(...))`.
+  ///
+  /// **Merge rules:**
+  /// - Tool-level values always take precedence over server defaults for
+  ///   the same key.
+  /// - The [ToolAnnotations.title] field is _never_ inherited from server
+  ///   defaults; each tool must provide its own title.
+  /// - If neither server defaults nor tool-level annotations exist for a
+  ///   tool, no annotations are emitted for that tool.
+  ///
+  /// Example:
+  /// ```dart
+  /// @Server(
+  ///   annotationsDefault: ToolAnnotations(openWorldHint: false),
+  /// )
+  /// class MyService {
+  ///   @Tool(annotations: ToolAnnotations(readOnlyHint: true))
+  ///   // → merged: {readOnlyHint: true, openWorldHint: false}
+  ///   Future<User> getUser(int id) async { ... }
+  ///
+  ///   @Tool(description: 'Create user')
+  ///   // → merged: {openWorldHint: false} (server default only)
+  ///   Future<User> createUser(String name) async { ... }
+  /// }
+  /// ```
+  ///
+  /// Defaults to null (no server-wide annotation defaults).
+  final ToolAnnotations? annotationsDefault;
+
   /// Creates a server configuration annotation.
   ///
   /// [transport] determines the communication protocol (stdio or HTTP).
@@ -249,6 +284,7 @@ class Server {
   /// [codeMode] enables the search and execute tools for tool orchestration.
   /// [codeModeTimeout] sets the max execution time for code mode scripts.
   /// [logErrors] controls whether internal errors are logged to stderr.
+  /// [annotationsDefault] provides server-wide defaults for tool annotation hints.
   const Server({
     this.transport = McpTransport.stdio,
     this.generateJson = false,
@@ -261,6 +297,7 @@ class Server {
     this.codeMode = false,
     this.codeModeTimeout = 30,
     this.logErrors = false,
+    this.annotationsDefault,
   });
 }
 
@@ -285,12 +322,20 @@ typedef Mcp = Server;
 /// The [icons] parameter allows specifying icon URLs for UI clients
 /// that display available tools.
 ///
+/// The [annotations] parameter provides behavioral hints to MCP clients,
+/// such as whether the tool is read-only, destructive, or idempotent.
+///
 /// Example:
 /// ```dart
 /// @Tool(
 ///   name: 'user_create',
 ///   description: 'Creates a new user in the system',
 ///   icons: ['https://example.com/user-icon.png'],
+///   annotations: ToolAnnotations(
+///     destructiveHint: false,
+///     idempotentHint: false,
+///     openWorldHint: false,
+///   ),
 /// )
 /// Future<User> createUser({required String name, required String email}) async {
 ///   // Implementation
@@ -316,6 +361,23 @@ class Tool {
   /// These icons may be displayed by MCP clients to visually identify
   /// the tool. Supported formats depend on the client.
   final List<String>? icons;
+
+  /// Optional behavioral annotations for this tool.
+  ///
+  /// Provides hints to MCP clients about the tool's behavior — whether it
+  /// is read-only, destructive, idempotent, or interacts with external
+  /// systems. Clients may use these hints to surface approval dialogs or
+  /// auto-permit safe operations.
+  ///
+  /// Example:
+  /// ```dart
+  /// @Tool(
+  ///   description: 'Get user by ID',
+  ///   annotations: ToolAnnotations(readOnlyHint: true),
+  /// )
+  /// Future<User?> getUser(int id) async { ... }
+  /// ```
+  final ToolAnnotations? annotations;
 
   /// Whether this tool should be available in code mode.
   ///
@@ -373,6 +435,8 @@ class Tool {
   /// [name] - Optional custom tool name (defaults to method name).
   /// [description] - Human-readable description of the tool's purpose.
   /// [icons] - Optional list of icon URLs for visual identification.
+  /// [annotations] - Behavioral hints for MCP clients (read-only,
+  ///   destructive, idempotent, open-world).
   /// [codeMode] - Whether this tool is available in the code mode sandbox
   ///   (default: true).
   /// [codeModeVisible] - Whether this tool remains listed in `tools/list`
@@ -381,8 +445,94 @@ class Tool {
     this.name,
     this.description,
     this.icons,
+    this.annotations,
     this.codeMode = true,
     this.codeModeVisible = false,
+  });
+}
+
+/// Metadata hints that describe a Tool's behavior to MCP clients.
+///
+/// These annotations inform clients _how_ a tool functions — whether it
+/// reads or mutates state, whether repeated calls are safe, and whether
+/// it interacts with external systems — enabling clients to automatically
+/// permit safe queries or request approval before risky actions.
+///
+/// **Important:** All properties are _hints_. Clients should not rely on
+/// them for security decisions.
+///
+/// Example:
+/// ```dart
+/// @Tool(
+///   description: 'Delete a user permanently',
+///   annotations: ToolAnnotations(
+///     destructiveHint: true,
+///     idempotentHint: true,
+///     openWorldHint: false,
+///   ),
+/// )
+/// Future<void> deleteUser(String id) async { ... }
+/// ```
+///
+/// Example — read-only tool:
+/// ```dart
+/// @Tool(
+///   description: 'Look up a user by ID',
+///   annotations: ToolAnnotations(
+///     title: 'Get User',
+///     readOnlyHint: true,
+///     openWorldHint: false,
+///   ),
+/// )
+/// Future<User?> getUser(int id) async { ... }
+/// ```
+@immutable
+class ToolAnnotations {
+  /// A human-readable title for the tool.
+  ///
+  /// When provided, MCP clients may display this instead of (or alongside)
+  /// the tool name.
+  final String? title;
+
+  /// If true, the tool does not modify its environment.
+  ///
+  /// Read-only tools are safe to call without side-effects. Defaults to
+  /// `false` when omitted.
+  final bool? readOnlyHint;
+
+  /// If true, the tool may perform destructive updates to its environment.
+  ///
+  /// Only meaningful when [readOnlyHint] is `false`. Defaults to `true`
+  /// when omitted (conservative assumption).
+  final bool? destructiveHint;
+
+  /// If true, calling the tool repeatedly with the same arguments will have
+  /// no additional effect on its environment.
+  ///
+  /// Only meaningful when [readOnlyHint] is `false`. Defaults to `false`
+  /// when omitted.
+  final bool? idempotentHint;
+
+  /// If true, this tool may interact with an "open world" of external
+  /// entities (e.g., the internet, third-party APIs).
+  ///
+  /// If false, the tool's domain of interaction is closed (e.g., a local
+  /// database or in-memory store). Defaults to `true` when omitted.
+  final bool? openWorldHint;
+
+  /// Creates tool annotations.
+  ///
+  /// [title] - Human-readable display title.
+  /// [readOnlyHint] - Tool does not modify its environment.
+  /// [destructiveHint] - Tool may perform destructive updates.
+  /// [idempotentHint] - Repeated calls with same args have no additional effect.
+  /// [openWorldHint] - Tool interacts with external entities.
+  const ToolAnnotations({
+    this.title,
+    this.readOnlyHint,
+    this.destructiveHint,
+    this.idempotentHint,
+    this.openWorldHint,
   });
 }
 

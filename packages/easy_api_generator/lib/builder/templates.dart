@@ -340,8 +340,8 @@ String _generateRunCodeSandbox() {
 
       return result;
     } finally {
-      process.kill(io.ProcessSignal.sigkill);
-      await tempDir.delete(recursive: true);
+      process?.kill(io.ProcessSignal.sigkill);
+      await tempDir?.delete(recursive: true);
     }
   }''';
 }
@@ -469,6 +469,32 @@ String _generateCodeModeHandlers(
   ].join('\n');
 }
 
+/// Generates the ToolAnnotations expression for a tool, or empty string if none.
+String _generateAnnotationsExpression(Map<String, dynamic> tool) {
+  final annotations = tool['annotations'] as Map<String, dynamic>?;
+  if (annotations == null || annotations.isEmpty) return '';
+
+  final parts = <String>[];
+  if (annotations.containsKey('title')) {
+    parts.add("title: '${_escapeDartString(annotations['title'] as String)}'");
+  }
+  if (annotations.containsKey('readOnlyHint')) {
+    parts.add('readOnlyHint: ${annotations['readOnlyHint']}');
+  }
+  if (annotations.containsKey('destructiveHint')) {
+    parts.add('destructiveHint: ${annotations['destructiveHint']}');
+  }
+  if (annotations.containsKey('idempotentHint')) {
+    parts.add('idempotentHint: ${annotations['idempotentHint']}');
+  }
+  if (annotations.containsKey('openWorldHint')) {
+    parts.add('openWorldHint: ${annotations['openWorldHint']}');
+  }
+
+  if (parts.isEmpty) return '';
+  return '\n        annotations: ToolAnnotations(${parts.join(', ')}),';
+}
+
 // ---------------------------------------------------------------------------
 // StdioTemplate
 // ---------------------------------------------------------------------------
@@ -539,12 +565,13 @@ class StdioTemplate {
           final schema = SchemaBuilder.buildObjectSchema(
             (t['parameters'] as List<Map<String, dynamic>>? ?? []),
           );
+          final annotationsExpr = _generateAnnotationsExpression(t);
           return '''
     registerTool(
       Tool(
         name: '$name',
         description: '${t['description'] ?? 'Tool $name'}',
-        inputSchema: $schema,
+        inputSchema: $schema,$annotationsExpr
       ),
       _$name,
     );''';
@@ -889,12 +916,13 @@ class HttpTemplate {
           final schema = SchemaBuilder.buildObjectSchema(
             (t['parameters'] as List<Map<String, dynamic>>? ?? []),
           );
+          final annotationsExpr = _generateAnnotationsExpression(t);
           return '''
     registerTool(
       Tool(
         name: '$name',
         description: '${t['description'] ?? 'Tool $name'}',
-        inputSchema: $schema,
+        inputSchema: $schema,$annotationsExpr
       ),
       _$name,
     );''';

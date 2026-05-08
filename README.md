@@ -200,6 +200,9 @@ Controls the transport type and configuration for the generated server.
   generateRest: false,           // Default: false — generate .openapi.json REST spec
   toolPrefix: 'user_service_',   // Optional: prefix all tool names
   autoClassPrefix: true,         // Optional: prefix with class name
+  annotationsDefault: ToolAnnotations(  // Optional: server-wide defaults for tool hints
+    openWorldHint: false,
+  ),
 )
 ```
 
@@ -229,6 +232,30 @@ Future<bool> deleteUser(int id) async { ... }
 ```
 
 If `description` is omitted, the function's doc comment is used. Use `name` to customize the tool name for avoiding collisions or better organization. Set `codeMode` to `false` for tools that should not be available in batch orchestration (e.g., destructive operations).
+
+#### Tool Annotations
+
+Tools can carry behavioral hints via `ToolAnnotations` that inform MCP clients how they function:
+
+- **`title`** — Human-readable display title.
+- **`readOnlyHint`** — If `true`, the tool does not modify its environment (safe for auto-approval).
+- **`destructiveHint`** — If `true`, the tool may perform destructive updates (clients should prompt for confirmation).
+- **`idempotentHint`** — If `true`, repeated calls with the same arguments have no additional effect (safe to retry).
+- **`openWorldHint`** — If `true`, the tool interacts with external entities like APIs or the internet. If `false`, it operates within a closed system.
+
+Set server-wide defaults with `@Server(annotationsDefault: ...)` so all tools inherit the same hints unless overridden. If neither server defaults nor per-tool annotations are set, no annotations are emitted in the generated output.
+
+```dart
+@Tool(
+  description: 'Get user by ID',
+  annotations: ToolAnnotations(
+    title: 'Get User',
+    readOnlyHint: true,
+    openWorldHint: false,
+  ),
+)
+Future<User?> getUser(int id) async { ... }
+```
 
 ### `@Parameter` (Optional)
 

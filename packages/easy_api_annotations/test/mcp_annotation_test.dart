@@ -38,10 +38,26 @@ void main() {
       expect(annotation.address, '0.0.0.0');
     });
 
-    test('Mcp typedef is a deprecated alias of Server', () {
-      // ignore: deprecated_member_use_from_same_package
-      const Mcp alias = Server();
-      expect(alias, isA<Server>());
+    test(
+      'accepts annotationsDefault for server-wide tool annotation hints',
+      () {
+        const annotation = Server(
+          annotationsDefault: ToolAnnotations(
+            readOnlyHint: true,
+            openWorldHint: false,
+          ),
+        );
+        expect(annotation.annotationsDefault, isNotNull);
+        expect(annotation.annotationsDefault!.readOnlyHint, isTrue);
+        expect(annotation.annotationsDefault!.openWorldHint, isFalse);
+        expect(annotation.annotationsDefault!.destructiveHint, isNull);
+        expect(annotation.annotationsDefault!.idempotentHint, isNull);
+      },
+    );
+
+    test('annotationsDefault defaults to null', () {
+      const annotation = Server();
+      expect(annotation.annotationsDefault, isNull);
     });
   });
 

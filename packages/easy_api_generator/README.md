@@ -156,6 +156,42 @@ Either configuration generates a `.openapi.json` with RESTful endpoints:
 - ✅ Parameter metadata from `@Parameter` annotations
 - ✅ Compatible with Swagger UI, API gateways, and code generators
 
+### Tool Annotations
+
+The generator supports `ToolAnnotations` for behavioral hints that inform MCP clients how tools function:
+
+- **`title`** — Human-readable display title for the tool.
+- **`readOnlyHint`** — If `true`, the tool does not modify its environment (safe for auto-approval).
+- **`destructiveHint`** — If `true`, the tool may perform destructive updates (clients should prompt for confirmation).
+- **`idempotentHint`** — If `true`, repeated calls with the same arguments have no additional effect (safe to retry).
+- **`openWorldHint`** — If `true`, the tool interacts with external entities like APIs or the internet. If `false`, it operates within a closed system (e.g., local database, in-memory store).
+
+Annotations can come from two sources:
+
+- **`@Server(annotationsDefault: ...)`** — provides server-wide defaults for the 4 boolean hints. All tools inherit these defaults.
+- **`@Tool(annotations: ...)`** — provides per-tool annotations. Per-tool values always take precedence over server defaults for the same key. The `title` field is tool-specific and never inherited from server defaults.
+
+**Emission rule:** If neither `annotationsDefault` (on `@Server`) nor `annotations` (on `@Tool`) are set for a tool, **no `annotations` field is emitted** in the generated output. The generator only produces annotations when at least one source provides values.
+
+```dart
+@Server(
+  annotationsDefault: ToolAnnotations(openWorldHint: false),
+)
+class MyService {
+  @Tool(annotations: ToolAnnotations(readOnlyHint: true))
+  // → Generated annotations: {readOnlyHint: true, openWorldHint: false}
+  Future<User> getUser(int id) async { ... }
+
+  @Tool(description: 'Create user')
+  // → Generated annotations: {openWorldHint: false} (server default only)
+  Future<User> createUser(String name) async { ... }
+
+  @Tool(description: 'Ping')
+  // → No annotations emitted (neither server defaults nor tool annotations)
+  String ping() => 'pong';
+}
+```
+
 ### Parameter Annotations (Optional)
 
 Use `@Parameter` to provide rich metadata for tool parameters:

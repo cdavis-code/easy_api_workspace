@@ -12,6 +12,7 @@ import 'package:mcp_example/src/todo_store.dart';
   generateRest: true,
   codeMode: true,
   logErrors: true,
+  annotationsDefault: ToolAnnotations(openWorldHint: false),
 )
 Future<void> main() async {
   // Seed some initial data if the stores are empty

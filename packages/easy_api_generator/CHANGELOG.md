@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-05-08
+
+First stable release. Pairs with `easy_api_annotations` 1.0.0 and targets
+`dart_mcp` ≥ 0.5.0.
+
+### Added
+- Generator support for `ToolAnnotations` from `easy_api_annotations` 1.0.0.
+  Per-tool `@Tool(annotations: ToolAnnotations(...))` and server-wide
+  `@Server(annotationsDefault: ToolAnnotations(...))` are now emitted as
+  `ToolAnnotations(...)` expressions in both the generated stdio and HTTP
+  `.mcp.dart` templates.
+- Added `_extractToolAnnotations`, `_extractAnnotationsDefault`, and
+  `_mergeAnnotations` helpers in `McpBuilder` that resolve per-tool and
+  server-wide annotation hints and merge them per the documented rules
+  (tool-level overrides server defaults; `title` is never inherited).
+- Added `_generateAnnotationsExpression` helper in `templates.dart` that
+  emits only the non-null hint fields, producing minimal, readable
+  `ToolAnnotations(...)` literals in generated code.
+
+### Fixed
+- Hardened `_extractToolAnnotations` against a non-string `title` field:
+  `DartObject.toStringValue()` can legally return `null` even when the field
+  itself is non-null, so the extractor now guards the result and never stores
+  `null` under the `'title'` key (which would later fail an `as String` cast
+  during code generation).
+- The generated `_runCodeSandbox` method now uses null-safe cleanup
+  (`process?.kill(...)` and `await tempDir?.delete(...)`) in its `finally`
+  block, preventing `NoSuchMethodError` / `FileSystemException` when an
+  exception is thrown before those locals are assigned, or when the outer
+  `catch` already cleaned up the temp directory.
+
+### Changed
+- Bumped package version to 1.0.0 to signal API stability.
+- Targets `easy_api_annotations` 1.0.0 as the companion annotation package.
+
 ## [0.6.1] - 2026-05-01
 
 ### Fixed

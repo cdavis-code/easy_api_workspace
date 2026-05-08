@@ -456,7 +456,7 @@ Common issues and remedies:
 - [packages/easy_mcp_generator/lib/builder/templates.dart:496-501](file://packages/easy_mcp_generator/lib/builder/templates.dart#L496-L501)
 
 ## Security Considerations
-- CORS: The generated template does not include CORS headers; add appropriate headers if serving from browsers.
+- CORS: The generated HTTP server uses `Access-Control-Allow-Origin: *` to allow any origin. This is appropriate for local development but **for production deployments, CORS should be configured via your reverse proxy** (e.g., nginx, Cloudflare, AWS API Gateway) rather than relying on the generated server's wildcard CORS. The reverse proxy should restrict allowed origins to your specific trusted domains.
 - Authentication: No built-in authentication; integrate middleware or reverse proxy authentication as needed.
 - HTTPS: The template binds to loopback and does not enable TLS; deploy behind a reverse proxy for TLS termination.
 - Network exposure: The example demonstrates binding to '0.0.0.0' for external access; use '127.0.0.1' for local-only access.

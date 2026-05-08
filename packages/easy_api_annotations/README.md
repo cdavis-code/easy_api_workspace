@@ -102,6 +102,7 @@ class MyServer {
 | `codeMode` | `bool` | `false` | Enables `search`/`execute` tools backed by a Node.js sandbox for batch tool orchestration |
 | `codeModeTimeout` | `int` | `30` | Max execution time in seconds for code-mode scripts |
 | `logErrors` | `bool` | `false` | Whether to log internal errors to stderr for troubleshooting (client-facing messages stay generic) |
+| `annotationsDefault` | `ToolAnnotations?` | `null` | Server-wide default values for the 4 boolean tool annotation hints (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`). Individual tools can override any hint via their own `@Tool(annotations: ToolAnnotations(...))`. The `title` field is never inherited. **If neither `annotationsDefault` nor per-tool `annotations` are set, no annotations are emitted in the generated output.** |
 
 ### Parameter Annotations (Optional)
 
@@ -161,6 +162,42 @@ Future<User> createUser({
 | `icons` | `List<String>?` | `null` | List of icon URLs for UI clients |
 | `codeMode` | `bool` | `true` | Whether this tool is exposed inside the code-mode sandbox (`search`/`execute`). Set `false` for destructive ops |
 | `codeModeVisible` | `bool` | `false` | When the parent `@Server` has `codeMode: true`, keeps this tool visible in the standard `tools/list` response |
+
+### Tool Annotations
+
+Both `@Server` and `@Tool` accept `ToolAnnotations` for behavioral hints that inform MCP clients how tools function:
+
+- **`title`** — Human-readable display title for the tool.
+- **`readOnlyHint`** — If `true`, the tool does not modify its environment (safe for auto-approval).
+- **`destructiveHint`** — If `true`, the tool may perform destructive updates (clients should prompt for confirmation).
+- **`idempotentHint`** — If `true`, repeated calls with the same arguments have no additional effect (safe to retry).
+- **`openWorldHint`** — If `true`, the tool interacts with external entities like APIs or the internet. If `false`, it operates within a closed system (e.g., local database, in-memory store).
+
+Server-wide defaults:
+
+- **`@Server(annotationsDefault: ...)`** — sets server-wide defaults for the 4 boolean hints. Every tool inherits these unless it overrides them.
+- **`@Tool(annotations: ...)`** — sets per-tool annotations. Values here take precedence over server defaults for the same key. The `title` field is tool-specific and never inherited.
+
+**Emission rule:** If neither `annotationsDefault` (on `@Server`) nor `annotations` (on `@Tool`) are set for a tool, **no `annotations` field is emitted** in the generated `.mcp.json` or `.mcp.dart` output. Annotations are only generated when at least one source provides values.
+
+```dart
+@Server(
+  annotationsDefault: ToolAnnotations(openWorldHint: false),
+)
+class MyService {
+  @Tool(annotations: ToolAnnotations(readOnlyHint: true))
+  // → merged: {readOnlyHint: true, openWorldHint: false}
+  Future<User> getUser(int id) async { ... }
+
+  @Tool(description: 'Create user')
+  // → merged: {openWorldHint: false} (server default only)
+  Future<User> createUser(String name) async { ... }
+
+  @Tool(description: 'Ping')
+  // → no annotations emitted (neither server defaults nor tool annotations)
+  String ping() => 'pong';
+}
+```
 
 **Example with custom tool name:**
 

@@ -51,6 +51,7 @@ class McpBuilder extends Builder {
       library,
       config.toolPrefix,
       config.autoClassPrefix,
+      config.annotationsDefault,
     );
 
     if (tools.isEmpty) return; // No tools found anywhere
@@ -122,6 +123,7 @@ class McpBuilder extends Builder {
     LibraryElement library,
     String? toolPrefix,
     bool autoClassPrefix,
+    Map<String, dynamic>? annotationsDefault,
   ) async {
     final tools = <Map<String, dynamic>>[];
     const toolChecker = TypeChecker.fromUrl(
@@ -146,6 +148,8 @@ class McpBuilder extends Builder {
       final toolCodeMode = _extractToolCodeMode(toolAnnotation);
       // Extract codeModeVisible from @Tool annotation (defaults to false)
       final toolCodeModeVisible = _extractToolCodeModeVisible(toolAnnotation);
+      // Extract ToolAnnotations from @Tool annotation (optional)
+      final toolAnnotationsMap = _extractToolAnnotations(toolAnnotation);
 
       // Get the return type string, unwrapping Future<T> if async
       final returnType = _getTypeString(element.returnType);
@@ -159,6 +163,10 @@ class McpBuilder extends Builder {
         'returnType': returnType,
         'codeMode': toolCodeMode,
         'codeModeVisible': toolCodeModeVisible,
+        'annotations': _mergeAnnotations(
+          annotationsDefault,
+          toolAnnotationsMap,
+        ),
       });
     }
 
@@ -196,6 +204,8 @@ class McpBuilder extends Builder {
         final toolCodeMode = _extractToolCodeMode(toolAnnotation);
         // Extract codeModeVisible from @Tool annotation (defaults to false)
         final toolCodeModeVisible = _extractToolCodeModeVisible(toolAnnotation);
+        // Extract ToolAnnotations from @Tool annotation (optional)
+        final toolAnnotationsMap = _extractToolAnnotations(toolAnnotation);
 
         // Get the return type string, unwrapping Future<T> if async
         final returnType = _getTypeString(method.returnType);
@@ -211,6 +221,10 @@ class McpBuilder extends Builder {
           'isStatic': method.isStatic,
           'codeMode': toolCodeMode,
           'codeModeVisible': toolCodeModeVisible,
+          'annotations': _mergeAnnotations(
+            annotationsDefault,
+            toolAnnotationsMap,
+          ),
         });
       }
     }
@@ -225,6 +239,7 @@ class McpBuilder extends Builder {
     LibraryElement library,
     String? toolPrefix,
     bool autoClassPrefix,
+    Map<String, dynamic>? annotationsDefault,
   ) async {
     final allTools = <Map<String, dynamic>>[];
     final aliasCounts = <String, int>{};
@@ -238,6 +253,7 @@ class McpBuilder extends Builder {
       library,
       toolPrefix,
       autoClassPrefix,
+      annotationsDefault,
     );
     final currentAlias = _deriveAlias(currentPackageUri);
     for (final tool in currentLibTools) {
@@ -264,6 +280,7 @@ class McpBuilder extends Builder {
         importedLib,
         toolPrefix,
         autoClassPrefix,
+        annotationsDefault,
       );
       if (importedTools.isEmpty) continue;
 
@@ -698,6 +715,7 @@ class McpBuilder extends Builder {
           'properties': properties,
           if (required.isNotEmpty) 'required': required,
         },
+        if (t['annotations'] != null) 'annotations': t['annotations'],
       });
     }
 
@@ -753,6 +771,7 @@ class McpBuilder extends Builder {
       codeMode: _peekBool(reader, 'codeMode') ?? false,
       codeModeTimeout: _peekInt(reader, 'codeModeTimeout') ?? 30,
       logErrors: _peekBool(reader, 'logErrors') ?? false,
+      annotationsDefault: _extractAnnotationsDefault(reader),
     );
   }
 
@@ -815,6 +834,117 @@ class McpBuilder extends Builder {
     }
     return false;
   }
+
+  /// Extracts the `annotations` field from a `@Tool` annotation.
+  ///
+  /// Returns a map with the non-null annotation hints (title, readOnlyHint,
+  /// destructiveHint, idempotentHint, openWorldHint), or null if no
+  /// annotations are specified.
+  Map<String, dynamic>? _extractToolAnnotations(DartObject? toolAnnotation) {
+    if (toolAnnotation == null) return null;
+    final reader = ConstantReader(toolAnnotation);
+    final annotationsField = reader.peek('annotations');
+    if (annotationsField == null || annotationsField.isNull) return null;
+
+    final annotationsObj = annotationsField.objectValue;
+    final result = <String, dynamic>{};
+
+    // Extract title
+    final title = annotationsObj.getField('title');
+    if (title != null && !title.isNull) {
+      final titleValue = title.toStringValue();
+      if (titleValue != null) {
+        result['title'] = titleValue;
+      }
+    }
+
+    // Extract readOnlyHint
+    final readOnlyHint = annotationsObj.getField('readOnlyHint');
+    if (readOnlyHint != null && !readOnlyHint.isNull) {
+      result['readOnlyHint'] = readOnlyHint.toBoolValue();
+    }
+
+    // Extract destructiveHint
+    final destructiveHint = annotationsObj.getField('destructiveHint');
+    if (destructiveHint != null && !destructiveHint.isNull) {
+      result['destructiveHint'] = destructiveHint.toBoolValue();
+    }
+
+    // Extract idempotentHint
+    final idempotentHint = annotationsObj.getField('idempotentHint');
+    if (idempotentHint != null && !idempotentHint.isNull) {
+      result['idempotentHint'] = idempotentHint.toBoolValue();
+    }
+
+    // Extract openWorldHint
+    final openWorldHint = annotationsObj.getField('openWorldHint');
+    if (openWorldHint != null && !openWorldHint.isNull) {
+      result['openWorldHint'] = openWorldHint.toBoolValue();
+    }
+
+    return result.isEmpty ? null : result;
+  }
+
+  /// Extracts the `annotationsDefault` field from a `@Server` annotation.
+  ///
+  /// Only the 4 boolean hints are extracted (title is excluded because it is
+  /// tool-specific and should never be inherited from server defaults).
+  Map<String, dynamic>? _extractAnnotationsDefault(ConstantReader reader) {
+    final annotationsField = reader.peek('annotationsDefault');
+    if (annotationsField == null || annotationsField.isNull) return null;
+
+    final annotationsObj = annotationsField.objectValue;
+    final result = <String, dynamic>{};
+
+    // Extract readOnlyHint
+    final readOnlyHint = annotationsObj.getField('readOnlyHint');
+    if (readOnlyHint != null && !readOnlyHint.isNull) {
+      result['readOnlyHint'] = readOnlyHint.toBoolValue();
+    }
+
+    // Extract destructiveHint
+    final destructiveHint = annotationsObj.getField('destructiveHint');
+    if (destructiveHint != null && !destructiveHint.isNull) {
+      result['destructiveHint'] = destructiveHint.toBoolValue();
+    }
+
+    // Extract idempotentHint
+    final idempotentHint = annotationsObj.getField('idempotentHint');
+    if (idempotentHint != null && !idempotentHint.isNull) {
+      result['idempotentHint'] = idempotentHint.toBoolValue();
+    }
+
+    // Extract openWorldHint
+    final openWorldHint = annotationsObj.getField('openWorldHint');
+    if (openWorldHint != null && !openWorldHint.isNull) {
+      result['openWorldHint'] = openWorldHint.toBoolValue();
+    }
+
+    return result.isEmpty ? null : result;
+  }
+
+  /// Merges server-level annotation defaults with per-tool annotations.
+  ///
+  /// Tool-level values take precedence over server defaults for the same key.
+  /// The `title` field from tool annotations is always preserved.
+  /// Returns null only when both inputs are null.
+  Map<String, dynamic>? _mergeAnnotations(
+    Map<String, dynamic>? serverDefaults,
+    Map<String, dynamic>? toolAnnotations,
+  ) {
+    if (serverDefaults == null && toolAnnotations == null) return null;
+    if (serverDefaults == null) return toolAnnotations;
+    if (toolAnnotations == null) {
+      return Map<String, dynamic>.from(serverDefaults);
+    }
+
+    // Start with server defaults, overlay tool-level values
+    final merged = Map<String, dynamic>.from(serverDefaults);
+    for (final entry in toolAnnotations.entries) {
+      merged[entry.key] = entry.value;
+    }
+    return merged;
+  }
 }
 
 /// Immutable view of the fields on a `@Server` annotation, resolved with
@@ -833,6 +963,7 @@ class _ServerConfig {
     required this.codeMode,
     required this.codeModeTimeout,
     required this.logErrors,
+    required this.annotationsDefault,
   });
 
   final String transport;
@@ -846,6 +977,7 @@ class _ServerConfig {
   final bool codeMode;
   final int codeModeTimeout;
   final bool logErrors;
+  final Map<String, dynamic>? annotationsDefault;
 }
 
 Builder mcpBuilder(BuilderOptions options) => McpBuilder();

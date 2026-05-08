@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-05-08
+
+First stable release. The annotation surface is now considered API-stable;
+future breaking changes will follow semver.
+
+### Added
+- Added `ToolAnnotations` class for describing tool behavior to MCP clients via
+  hint properties: `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
+  and `openWorldHint`. Clients can use these hints to auto-approve safe
+  read-only calls or prompt for confirmation on destructive operations.
+- Added `Tool.annotations` field for attaching `ToolAnnotations` to individual
+  tools.
+- Added `Server.annotationsDefault` field for server-wide default annotation
+  hints. The 4 boolean hints cascade from server defaults to every generated
+  tool; tool-level values take precedence for the same key, and `title` is
+  never inherited (it is intentionally tool-specific).
+- Documented `ToolAnnotations` merge semantics in DartDoc with worked examples.
+
+### Changed
+- Bumped package version to 1.0.0 to signal API stability.
+- Expanded `@Tool` DartDoc with `annotations` parameter usage examples.
+
 ## [0.6.0] - 2026-04-30
 
 ### Added

@@ -6,6 +6,9 @@ import 'todo.dart';
 import 'user.dart';
 import 'user_store.dart';
 
+@Server(
+  annotationsDefault: ToolAnnotations(openWorldHint: false, readOnlyHint: true),
+)
 class TodoStore {
   static const _filePath = 'todos.json';
   static const _usersFilePath = 'users.json';
@@ -66,7 +69,12 @@ class TodoStore {
   }
 
   /// Creates a new todo with the given title.
-  @Tool(description: 'Create a new todo')
+  ///
+  /// This tool overrides the server's readOnlyHint default because it modifies data.
+  @Tool(
+    description: 'Create a new todo',
+    annotations: ToolAnnotations(readOnlyHint: false, destructiveHint: false),
+  )
   static Future<Todo> createTodo({required String title}) async {
     final todos = await _loadTodos();
     final todo = Todo(id: _nextId, title: title);
@@ -94,7 +102,10 @@ class TodoStore {
 
   /// Deletes a todo by its ID.
   /// Also removes the todo reference from all users.
-  @Tool(description: 'Delete a todo')
+  @Tool(
+    description: 'Delete a todo',
+    annotations: ToolAnnotations(readOnlyHint: false, idempotentHint: true),
+  )
   static Future<bool> deleteTodo(int id) async {
     final todos = await _loadTodos();
     final initialLength = todos.length;
@@ -126,7 +137,10 @@ class TodoStore {
   }
 
   /// Marks a todo as completed.
-  @Tool(description: 'Mark a todo as completed')
+  @Tool(
+    description: 'Mark a todo as completed',
+    annotations: ToolAnnotations(readOnlyHint: false, idempotentHint: true),
+  )
   static Future<Todo?> completeTodo(int id) async {
     final todos = await _loadTodos();
     final index = todos.indexWhere((t) => t.id == id);
@@ -142,7 +156,10 @@ class TodoStore {
 
   /// Assigns a todo to a user.
   /// Updates both the todo's userIds and the user's todoIds.
-  @Tool(description: 'Assign a todo to a user')
+  @Tool(
+    description: 'Assign a todo to a user',
+    annotations: ToolAnnotations(readOnlyHint: false, idempotentHint: true),
+  )
   static Future<Todo?> assignTodoToUser({
     required int todoId,
     required int userId,
@@ -183,7 +200,10 @@ class TodoStore {
 
   /// Removes a user from a todo.
   /// Updates both the todo's userIds and the user's todoIds.
-  @Tool(description: 'Remove a user from a todo')
+  @Tool(
+    description: 'Remove a user from a todo',
+    annotations: ToolAnnotations(readOnlyHint: false, idempotentHint: true),
+  )
   static Future<Todo?> removeTodoFromUser({
     required int todoId,
     required int userId,

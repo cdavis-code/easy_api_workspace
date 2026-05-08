@@ -236,13 +236,26 @@ The generated MCP server exposes 14 tools organized by store:
 | `transport` | `McpTransport` | `McpTransport.stdio` | Transport protocol (stdio or http) |
 | `port` | `int` | `3000` | HTTP server port (only for HTTP transport) |
 | `address` | `String` | `'127.0.0.1'` | HTTP bind address (only for HTTP transport). Use `'0.0.0.0'` to listen on all interfaces |
+| `generateMcp` | `bool` | `true` | Whether to generate the MCP server (`.mcp.dart`) |
+| `generateJson` | `bool` | `false` | Whether to generate `.mcp.json` tool-metadata file |
+| `generateRest` | `bool` | `false` | Whether to generate a REST API server (`.openapi.dart`) and OpenAPI 3.0 spec (`.openapi.json`) |
+| `toolPrefix` | `String?` | `null` | Prefix added to all tool names (e.g., `'user_'` makes `createUser` → `user_createUser`) |
+| `autoClassPrefix` | `bool` | `false` | Automatically prefix tool names with class name (e.g., `UserService_createUser`) |
+| `codeMode` | `bool` | `false` | Enables `search`/`execute` tools backed by a Node.js sandbox for batch tool orchestration |
+| `codeModeTimeout` | `int` | `30` | Max execution time in seconds for code-mode scripts |
+| `logErrors` | `bool` | `false` | Whether to log internal errors to stderr for troubleshooting |
+| `annotationsDefault` | `ToolAnnotations?` | `null` | Server-wide defaults for the 4 boolean tool annotation hints. Individual tools can override via `@Tool(annotations: ...)`. |
 
 ### `@Tool`
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `name` | `String?` | `null` | Custom tool name (defaults to method name) |
 | `description` | `String?` | auto-extract | Tool description (falls back to doc comment) |
 | `icons` | `List<String>?` | `null` | Icon URLs |
+| `annotations` | `ToolAnnotations?` | `null` | Behavioral hints for MCP clients: `title` (display name), `readOnlyHint` (no side-effects), `destructiveHint` (may delete/modify), `idempotentHint` (safe to retry), `openWorldHint` (interacts with external systems) |
+| `codeMode` | `bool` | `true` | Whether this tool is exposed inside the code-mode sandbox |
+| `codeModeVisible` | `bool` | `false` | When `@Server` has `codeMode: true`, keeps this tool visible in the standard `tools/list` response |
 
 ## 🚚 Transport Modes
 

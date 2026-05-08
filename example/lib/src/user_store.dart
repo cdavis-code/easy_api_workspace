@@ -6,6 +6,9 @@ import 'user.dart';
 import 'todo.dart';
 import 'todo_store.dart';
 
+@Server(
+  annotationsDefault: ToolAnnotations(openWorldHint: false, readOnlyHint: true),
+)
 class UserStore {
   static const _filePath = 'users.json';
   static List<User>? _cache;
@@ -48,7 +51,16 @@ class UserStore {
   }
 
   /// Creates a new user with the given name and email.
-  @Tool(description: 'Create a new user')
+  ///
+  /// This tool overrides the server's readOnlyHint default because it modifies data.
+  @Tool(
+    description: 'Create a new user',
+    annotations: ToolAnnotations(
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+    ),
+  )
   static Future<User> createUser({
     @Parameter(
       title: 'Full Name',
@@ -104,7 +116,17 @@ class UserStore {
 
   /// Deletes a user by their ID.
   /// Also removes the user reference from all todos.
-  @Tool(description: 'Delete a user', codeMode: false)
+  ///
+  /// This tool overrides the server's readOnlyHint default because it modifies data.
+  @Tool(
+    description: 'Delete a user',
+    codeMode: false,
+    annotations: ToolAnnotations(
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+    ),
+  )
   static Future<bool> deleteUser(int id) async {
     final users = await _loadUsers();
     final initialLength = users.length;
