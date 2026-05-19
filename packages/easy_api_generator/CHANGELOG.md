@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-05-19
+
+### Security
+- `registerTool(...)` interpolation in both stdio and HTTP templates now
+  routes the tool `name` and `description` through `_escapeDartString`, so
+  doc comments containing apostrophes, `$`, or backslashes can no longer
+  break the generated Dart literal or trigger unintended string
+  interpolation. (M1)
+- Added identifier validation for user-supplied annotation values that
+  flow into generated source: `@Tool(name:)`, `@Server(toolPrefix:)`, and
+  `@Parameter(alias:)` must now match `^[a-zA-Z_][a-zA-Z0-9_]*$`. The
+  builder raises an `InvalidGenerationSourceError` otherwise. This closes
+  a source-injection vector in both the generated Dart member references
+  (`_$name`) and the Code Mode JS wrapper's `external_<toolName>` helpers.
+  (M2 / transitively M3)
+
+### Documentation
+- Added a "Security & Operational Caveats" section to the package README
+  covering: (a) the interaction between `@Server(logErrors: true)` and
+  `@Parameter(sensitive: true)` — `sensitive` is a transport/UI hint and
+  does not redact local stderr — and (b) the trust model of Code Mode,
+  clarifying that the Node.js subprocess is a *resource* sandbox bounded
+  by `--max-old-space-size=64` and `codeModeTimeout`, not a security
+  boundary. (L1, L2)
+
+### Fixed
+- Generated MCP tool handlers now preserve the original Dart-type
+  nullability of each parameter and re-emit any default-value expression.
+  Previously every optional parameter was cast as `Type?`, which broke AOT
+  compilation when the underlying method declared an optional non-nullable
+  parameter with a default (e.g. `[String greeting = 'hi']`). The builder
+  now captures `isNullable` and `defaultValueCode` from the analyzer
+  (`_extractParametersFromElement` in `mcp_builder.dart`) and the stdio /
+  HTTP templates render the appropriate cast: required params keep their
+  original nullability, optional + nullable params cast as `Type?`, and
+  optional + non-nullable params with defaults emit
+  `(arguments?['x'] as Type?) ?? defaultLiteral` so the call site sees a
+  non-nullable value.
+
 ## [1.0.0] - 2026-05-08
 
 First stable release. Pairs with `easy_api_annotations` 1.0.0 and targets

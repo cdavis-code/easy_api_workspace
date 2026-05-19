@@ -347,6 +347,203 @@ void main() {
     });
   });
 
+  group('Parameter nullability and defaults', () {
+    Map<String, dynamic> toolWithParam(Map<String, dynamic> param) =>
+        <String, dynamic>{
+          'name': 'doThing',
+          'description': 'Test tool',
+          'parameters': <Map<String, dynamic>>[param],
+          'isAsync': true,
+          'sourceImport': 'package:example/store.dart',
+          'sourceAlias': 'store',
+        };
+
+    test('required non-nullable parameter casts without ?', () {
+      final result = StdioTemplate.generate([
+        toolWithParam(<String, dynamic>{
+          'name': 'name',
+          'type': 'String',
+          'schemaMap': {'type': 'string'},
+          'isOptional': false,
+          'isNullable': false,
+          'defaultValueCode': null,
+        }),
+      ]);
+      expect(
+        result,
+        contains("final name = request.arguments!['name'] as String;"),
+      );
+      expect(
+        result,
+        isNot(contains("final name = request.arguments!['name'] as String?;")),
+      );
+    });
+
+    test('required nullable parameter preserves trailing ?', () {
+      final result = StdioTemplate.generate([
+        toolWithParam(<String, dynamic>{
+          'name': 'name',
+          'type': 'String?',
+          'schemaMap': {'type': 'string'},
+          'isOptional': false,
+          'isNullable': true,
+          'defaultValueCode': null,
+        }),
+      ]);
+      expect(
+        result,
+        contains("final name = request.arguments!['name'] as String?;"),
+      );
+    });
+
+    test('optional nullable parameter without default uses nullable cast', () {
+      final result = StdioTemplate.generate([
+        toolWithParam(<String, dynamic>{
+          'name': 'name',
+          'type': 'String?',
+          'schemaMap': {'type': 'string'},
+          'isOptional': true,
+          'isNullable': true,
+          'defaultValueCode': null,
+        }),
+      ]);
+      expect(
+        result,
+        contains("final name = request.arguments?['name'] as String?;"),
+      );
+    });
+
+    test(
+      'optional non-nullable String parameter with default emits ?? fallback',
+      () {
+        final result = StdioTemplate.generate([
+          toolWithParam(<String, dynamic>{
+            'name': 'greeting',
+            'type': 'String',
+            'schemaMap': {'type': 'string'},
+            'isOptional': true,
+            'isNullable': false,
+            'defaultValueCode': "'hi'",
+          }),
+        ]);
+        expect(
+          result,
+          contains(
+            "final greeting = (request.arguments?['greeting'] as String?) ?? 'hi';",
+          ),
+        );
+      },
+    );
+
+    test(
+      'optional non-nullable int parameter with default emits ?? fallback',
+      () {
+        final result = StdioTemplate.generate([
+          toolWithParam(<String, dynamic>{
+            'name': 'count',
+            'type': 'int',
+            'schemaMap': {'type': 'integer'},
+            'isOptional': true,
+            'isNullable': false,
+            'defaultValueCode': '0',
+          }),
+        ]);
+        expect(
+          result,
+          contains("final count = (request.arguments?['count'] as int?) ?? 0;"),
+        );
+      },
+    );
+
+    test('alias is honored for required non-nullable parameter', () {
+      final result = StdioTemplate.generate([
+        toolWithParam(<String, dynamic>{
+          'name': 'query',
+          'type': 'String',
+          'schemaMap': {'type': 'string'},
+          'isOptional': false,
+          'isNullable': false,
+          'defaultValueCode': null,
+          'parameterMetadata': <String, dynamic>{'alias': 'q'},
+        }),
+      ]);
+      expect(
+        result,
+        contains("final query = request.arguments!['q'] as String;"),
+      );
+    });
+
+    test('HttpTemplate applies the same nullability/default rules', () {
+      final result = HttpTemplate.generate(
+        [
+          toolWithParam(<String, dynamic>{
+            'name': 'greeting',
+            'type': 'String',
+            'schemaMap': {'type': 'string'},
+            'isOptional': true,
+            'isNullable': false,
+            'defaultValueCode': "'hi'",
+          }),
+        ],
+        3000,
+        '127.0.0.1',
+      );
+      expect(
+        result,
+        contains(
+          "final greeting = (request.arguments?['greeting'] as String?) ?? 'hi';",
+        ),
+      );
+    });
+  });
+
+  group('Tool description escaping', () {
+    Map<String, dynamic> toolWithDescription(String description) =>
+        <String, dynamic>{
+          'name': 'doThing',
+          'description': description,
+          'parameters': <Map<String, dynamic>>[],
+          'isAsync': true,
+          'sourceImport': 'package:example/store.dart',
+          'sourceAlias': 'store',
+        };
+
+    test('StdioTemplate escapes single quotes in description', () {
+      final result = StdioTemplate.generate(<Map<String, dynamic>>[
+        toolWithDescription("It's a tool"),
+      ]);
+      // Must produce a valid Dart single-quoted literal — the apostrophe
+      // has to be backslash-escaped, never bare.
+      expect(result, contains(r"description: 'It\'s a tool'"));
+      expect(result, isNot(contains("description: 'It's a tool'")));
+    });
+
+    test('StdioTemplate escapes dollar signs in description', () {
+      final result = StdioTemplate.generate(<Map<String, dynamic>>[
+        toolWithDescription(r'Costs $5'),
+      ]);
+      // `$` would otherwise trigger Dart string interpolation in the
+      // generated source; the escape helper must neutralize it.
+      expect(result, contains(r"description: 'Costs \$5'"));
+    });
+
+    test('StdioTemplate escapes backslashes in description', () {
+      final result = StdioTemplate.generate(<Map<String, dynamic>>[
+        toolWithDescription(r'C:\path\to\thing'),
+      ]);
+      expect(result, contains(r"description: 'C:\\path\\to\\thing'"));
+    });
+
+    test('HttpTemplate escapes single quotes in description', () {
+      final result = HttpTemplate.generate(
+        <Map<String, dynamic>>[toolWithDescription("It's a tool")],
+        3000,
+        '127.0.0.1',
+      );
+      expect(result, contains(r"description: 'It\'s a tool'"));
+    });
+  });
+
   group('HttpTemplate', () {
     late List<Map<String, dynamic>> tools;
 

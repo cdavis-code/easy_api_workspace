@@ -495,6 +495,40 @@ String _generateAnnotationsExpression(Map<String, dynamic> tool) {
   return '\n        annotations: ToolAnnotations(${parts.join(', ')}),';
 }
 
+/// Renders a single MCP parameter extraction line for either transport.
+///
+/// Honors the original Dart-type nullability captured by the builder
+/// (`isNullable`) and any default-value source code (`defaultValueCode`)
+/// so optional non-nullable parameters with defaults compile under AOT.
+///
+/// [p] is the parameter map produced by `McpBuilder._extractParametersFromElement`.
+/// [dartType] is the normalized Dart type (with original nullable suffix).
+String _renderMcpParamExtraction(Map<String, dynamic> p, String dartType) {
+  final paramName = p['name'] as String;
+  final isOptional = p['isOptional'] == true;
+  final defaultCode = p['defaultValueCode'] as String?;
+  final externalName =
+      (p['parameterMetadata']?['alias'] as String?) ?? paramName;
+
+  if (!isOptional) {
+    // Required: keep original nullability of dartType ("String" or "String?").
+    return "    final $paramName = request.arguments!['$externalName'] as $dartType;";
+  }
+
+  // Optional: read via null-safe access. Cast must be nullable since the key
+  // may be absent.
+  final nullableCast = dartType.endsWith('?') ? dartType : '$dartType?';
+
+  if (defaultCode != null) {
+    // Optional with default: coerce missing/null back to the original literal,
+    // producing the non-nullable Dart type the call site expects.
+    return "    final $paramName = (request.arguments?['$externalName'] as $nullableCast) ?? $defaultCode;";
+  }
+
+  // Optional without default: original Dart type must already be nullable.
+  return "    final $paramName = request.arguments?['$externalName'] as $nullableCast;";
+}
+
 // ---------------------------------------------------------------------------
 // StdioTemplate
 // ---------------------------------------------------------------------------
@@ -562,15 +596,21 @@ class StdioTemplate {
     final toolRegistrations = listedTools
         .map((t) {
           final name = t['name'] as String;
+          final description = (t['description'] as String?) ?? 'Tool $name';
           final schema = SchemaBuilder.buildObjectSchema(
             (t['parameters'] as List<Map<String, dynamic>>? ?? []),
           );
           final annotationsExpr = _generateAnnotationsExpression(t);
+          // The Dart member reference `_$name` is safe because tool names are
+          // validated against `^[a-zA-Z_][a-zA-Z0-9_]*$` at extraction time;
+          // the string-literal interpolations still go through
+          // _escapeDartString so doc comments containing apostrophes, dollar
+          // signs, or backslashes never break the generated source.
           return '''
     registerTool(
       Tool(
-        name: '$name',
-        description: '${t['description'] ?? 'Tool $name'}',
+        name: '${_escapeDartString(name)}',
+        description: '${_escapeDartString(description)}',
         inputSchema: $schema,$annotationsExpr
       ),
       _$name,
@@ -588,20 +628,9 @@ class StdioTemplate {
           final params = t['parameters'] as List<Map<String, dynamic>>? ?? [];
           final paramExtractions = params
               .map((p) {
-                final paramName = p['name'] as String;
                 final paramType = p['type'] as String;
-                final isOptional = p['isOptional'] == true;
                 final dartType = _dartType(paramType);
-                // Use alias as external name when present
-                final externalName =
-                    (p['parameterMetadata']?['alias'] as String?) ?? paramName;
-                if (isOptional) {
-                  final nullableType = dartType.endsWith('?')
-                      ? dartType
-                      : '$dartType?';
-                  return "    final $paramName = request.arguments?['$externalName'] as $nullableType;";
-                }
-                return "    final $paramName = request.arguments!['$externalName'] as $dartType;";
+                return _renderMcpParamExtraction(p, dartType);
               })
               .join('\n');
 
@@ -706,6 +735,20 @@ $logErrorsConstant
         instructions: 'Auto-generated MCP server',
       ) {
 $toolRegistrations$codeModeRegistrations
+  }
+
+  /// Guards against duplicate initialization requests (e.g. from MCP Inspector
+  /// which may send `initialize` more than once for HTTP endpoints).
+  bool _isInitialized = false;
+  InitializeResult? _initializeResult;
+
+  @override
+  FutureOr<InitializeResult> initialize(InitializeRequest request) async {
+    if (_isInitialized) return _initializeResult!;
+    _isInitialized = true;
+    final result = await super.initialize(request);
+    _initializeResult = result;
+    return result;
   }
 
 $toolHandlers
@@ -913,15 +956,21 @@ class HttpTemplate {
     final toolRegistrations = listedTools
         .map((t) {
           final name = t['name'] as String;
+          final description = (t['description'] as String?) ?? 'Tool $name';
           final schema = SchemaBuilder.buildObjectSchema(
             (t['parameters'] as List<Map<String, dynamic>>? ?? []),
           );
           final annotationsExpr = _generateAnnotationsExpression(t);
+          // The Dart member reference `_$name` is safe because tool names are
+          // validated against `^[a-zA-Z_][a-zA-Z0-9_]*$` at extraction time;
+          // the string-literal interpolations still go through
+          // _escapeDartString so doc comments containing apostrophes, dollar
+          // signs, or backslashes never break the generated source.
           return '''
     registerTool(
       Tool(
-        name: '$name',
-        description: '${t['description'] ?? 'Tool $name'}',
+        name: '${_escapeDartString(name)}',
+        description: '${_escapeDartString(description)}',
         inputSchema: $schema,$annotationsExpr
       ),
       _$name,
@@ -939,20 +988,9 @@ class HttpTemplate {
           final params = t['parameters'] as List<Map<String, dynamic>>? ?? [];
           final paramExtractions = params
               .map((p) {
-                final paramName = p['name'] as String;
                 final paramType = p['type'] as String;
-                final isOptional = p['isOptional'] == true;
                 final dartType = _dartType(paramType);
-                // Use alias as external name when present
-                final externalName =
-                    (p['parameterMetadata']?['alias'] as String?) ?? paramName;
-                if (isOptional) {
-                  final nullableType = dartType.endsWith('?')
-                      ? dartType
-                      : '$dartType?';
-                  return "    final $paramName = request.arguments?['$externalName'] as $nullableType;";
-                }
-                return "    final $paramName = request.arguments!['$externalName'] as $dartType;";
+                return _renderMcpParamExtraction(p, dartType);
               })
               .join('\n');
 
@@ -1170,10 +1208,13 @@ Future<void> main() async {
     );
   }
 
+  // Use PORT env var (Cloud Run) or fall back to configured port
+  final serverPort = int.parse(io.Platform.environment['PORT'] ?? '$port');
+
   final httpServer = await shelf_io.serve(
     handleRequest,
     $addressExpression,
-    $port,
+    serverPort,
   );
 
   print('MCP HTTP server listening on port \${httpServer.port}');
@@ -1200,6 +1241,20 @@ $logErrorsConstant
         instructions: 'Auto-generated MCP server on port $port',
       ) {
 $toolRegistrations$codeModeRegistrations
+  }
+
+  /// Guards against duplicate initialization requests (e.g. from MCP Inspector
+  /// which may send `initialize` more than once for HTTP endpoints).
+  bool _isInitialized = false;
+  InitializeResult? _initializeResult;
+
+  @override
+  FutureOr<InitializeResult> initialize(InitializeRequest request) async {
+    if (_isInitialized) return _initializeResult!;
+    _isInitialized = true;
+    final result = await super.initialize(request);
+    _initializeResult = result;
+    return result;
   }
 
 $toolHandlers

@@ -139,10 +139,13 @@ Future<void> main() async {
     );
   }
 
+  // Use PORT env var (Cloud Run) or fall back to configured port
+  final serverPort = int.parse(io.Platform.environment['PORT'] ?? '8080');
+
   final httpServer = await shelf_io.serve(
     handleRequest,
     '0.0.0.0',
-    8080,
+    serverPort,
   );
 
   print('MCP HTTP server listening on port ${httpServer.port}');
@@ -202,6 +205,20 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
       ),
       _execute,
     );
+  }
+
+  /// Guards against duplicate initialization requests (e.g. from MCP Inspector
+  /// which may send `initialize` more than once for HTTP endpoints).
+  bool _isInitialized = false;
+  InitializeResult? _initializeResult;
+
+  @override
+  FutureOr<InitializeResult> initialize(InitializeRequest request) async {
+    if (_isInitialized) return _initializeResult!;
+    _isInitialized = true;
+    final result = await super.initialize(request);
+    _initializeResult = result;
+    return result;
   }
 
   FutureOr<CallToolResult> _createUser(CallToolRequest request) async {
@@ -665,8 +682,8 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
 
       return result;
     } finally {
-      process.kill(io.ProcessSignal.sigkill);
-      await tempDir.delete(recursive: true);
+      process?.kill(io.ProcessSignal.sigkill);
+      await tempDir?.delete(recursive: true);
     }
   }
   String _buildJsWrapper(String userCode) {

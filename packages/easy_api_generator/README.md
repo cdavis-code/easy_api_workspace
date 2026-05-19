@@ -20,11 +20,11 @@ Processes Dart code annotated with the `easy_api_annotations` package to produce
 
 ```yaml
 dependencies:
-  easy_api_annotations: ^0.6.0
+  easy_api_annotations: ^1.0.0
 
 dev_dependencies:
   build_runner: ^2.4.0
-  easy_api_generator: ^0.6.1
+  easy_api_generator: ^1.0.1
 ```
 
 ## Usage
@@ -335,6 +335,68 @@ The generated MCP server supports:
 - `initialize` - Standard MCP initialization
 - `tools/list` - Returns list of available tools with schemas
 - `tools/call` - Executes the requested tool with provided arguments
+
+## Security & Operational Caveats
+
+`easy_api_generator` produces servers that run with the full privileges of
+the host process. Operators should understand the following before exposing
+generated servers to untrusted callers.
+
+### Error logging and sensitive parameters
+
+The `@Server(logErrors: true)` flag is **opt-in** and writes the original
+exception message and stack trace to `stderr` when a tool handler throws.
+The MCP client always receives the generic message
+`"An error occurred while processing the request"` — internal detail never
+leaves the process via the protocol response.
+
+However, when `logErrors: true` is enabled, exceptions whose messages
+incorporate inbound argument values (for example, a validation error that
+echoes the offending input) **may surface those values in the local log
+stream**, even when the corresponding parameter is annotated
+`@Parameter(sensitive: true)`. The `sensitive` flag controls JSON-Schema
+metadata (`x-sensitive: true`, `format: password`) so that MCP clients can
+mask the field in UI/transport logs; it does not redact server-side stderr
+output.
+
+Recommended posture:
+
+- Leave `logErrors: false` (the default) in production unless you control
+  the log destination.
+- When `logErrors: true` is required, ensure that the process's stderr is
+  routed to a sink with the same trust level as the inputs themselves.
+- Avoid embedding raw parameter values in exception messages thrown from
+  tool handlers — log a redacted summary instead.
+
+### Code Mode is a resource sandbox, not a security sandbox
+
+`@Server(codeMode: true)` runs user-supplied JavaScript in a Node.js
+subprocess that is launched with `--max-old-space-size=64` and a wall-clock
+timeout (`codeModeTimeout`, default 30s). This is sufficient to bound
+runaway loops and accidental memory exhaustion, but it is **not** a
+security boundary:
+
+- The Node.js process inherits the parent's filesystem, network, and
+  environment access.
+- `require()` and Node built-ins (`fs`, `net`, `child_process`, etc.) are
+  not blocked.
+- The IPC channel that bridges JS calls back to Dart tools enforces only
+  the `@Tool(codeMode: ...)` allow-list — it does not audit arguments.
+
+Treat Code Mode scripts as **trusted code** that simply happens to be
+expressed in JS. Do not enable `codeMode` in deployments where the
+calling client is untrusted, and do not rely on the sandbox to contain
+malicious payloads. If you need true isolation, run the generated server
+inside a container, VM, or seccomp/jail profile that enforces the
+required boundaries externally.
+
+### Identifier validation
+
+User-supplied values that flow into generated Dart and JS source —
+`@Tool(name:)`, `@Server(toolPrefix:)`, and `@Parameter(alias:)` — must
+match `^[a-zA-Z_][a-zA-Z0-9_]*$`. The builder rejects anything else with
+an `InvalidGenerationSourceError` so that hostile annotation values
+cannot inject source code into the output.
 
 ## Contributing
 

@@ -358,6 +358,11 @@ class McpBuilder extends Builder {
   ///
   /// Priority: custom name from @Tool.name > method name
   /// Then applies toolPrefix if provided.
+  ///
+  /// User-supplied custom names are validated as identifiers because they are
+  /// interpolated into generated Dart member references (`_$name`) and, in
+  /// Code Mode, into JS function names. The `toolPrefix` is validated once at
+  /// `_extractServerConfig` time, so we do not re-validate it here.
   String _extractToolName(
     DartObject? toolAnnotation,
     String methodName,
@@ -371,6 +376,7 @@ class McpBuilder extends Builder {
     if (nameField != null && nameField.isString) {
       final customName = nameField.stringValue;
       if (customName.isNotEmpty) {
+        _validateIdentifier(customName, '@Tool(name:)');
         toolName = customName;
       }
     }
@@ -381,6 +387,33 @@ class McpBuilder extends Builder {
     }
 
     return toolName;
+  }
+
+  /// Pattern for identifiers that are safe to interpolate into both Dart and
+  /// JavaScript source: must start with a letter or underscore, followed by
+  /// alphanumeric or underscore characters.
+  ///
+  /// Applied to user-supplied values that flow into generated source:
+  /// `@Tool(name:)`, `@Server(toolPrefix:)`, `@Parameter(alias:)`.
+  /// Class names (used by `autoClassPrefix`) and Dart member names are not
+  /// re-validated because the Dart compiler already enforces this shape on
+  /// them.
+  static final RegExp _identifierPattern = RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$');
+
+  /// Throws [InvalidGenerationSourceError] when [value] is not a safe
+  /// identifier. Used to prevent source injection via annotation strings
+  /// that are interpolated unescaped into generated Dart and JS code.
+  void _validateIdentifier(String value, String context) {
+    if (!_identifierPattern.hasMatch(value)) {
+      throw InvalidGenerationSourceError(
+        "Invalid $context value '$value': must match "
+        r'/^[a-zA-Z_][a-zA-Z0-9_]*$/. '
+        'easy_api_generator interpolates this value into generated Dart and '
+        'JavaScript source, so non-identifier characters would break codegen '
+        'or enable source injection. Pick a name that is a valid identifier '
+        'in both languages.',
+      );
+    }
   }
 
   String _stripDocComment(String docComment) {
@@ -402,6 +435,11 @@ class McpBuilder extends Builder {
       final typeString = _getTypeString(param.type);
       final isOptional = !param.isRequired;
       final isNamedParam = param.isNamed;
+      // Preserve original Dart-type nullability so generated handlers can
+      // emit the correct cast even for optional non-nullable parameters.
+      final isNullable = typeString.endsWith('?');
+      // Source text of the default value expression, or null when absent.
+      final defaultValueCode = param.defaultValueCode;
 
       // Use full introspection for the schema map
       final schemaMap = _introspectType(param.type);
@@ -420,6 +458,8 @@ class McpBuilder extends Builder {
       params.add(<String, dynamic>{
         'name': param.name,
         'type': typeString,
+        'isNullable': isNullable,
+        'defaultValueCode': defaultValueCode,
         'schemaMap': schemaMap,
         'isOptional': isOptional,
         'isNamed': isNamedParam,
@@ -445,7 +485,12 @@ class McpBuilder extends Builder {
     // Extract alias
     final alias = reader.peek('alias');
     if (alias != null && !alias.isNull && alias.isString) {
-      metadata['alias'] = alias.stringValue;
+      final aliasValue = alias.stringValue;
+      // Aliases are interpolated into generated Dart string literals as JSON
+      // keys; validating them as identifiers keeps generated code well-formed
+      // and forbids source injection through quotes/backslashes/dollar signs.
+      _validateIdentifier(aliasValue, '@Parameter(alias:)');
+      metadata['alias'] = aliasValue;
     }
 
     // Extract title
@@ -759,11 +804,15 @@ class McpBuilder extends Builder {
     if (annotation == null) return null;
 
     final reader = ConstantReader(annotation);
+    final toolPrefix = _peekString(reader, 'toolPrefix');
+    if (toolPrefix != null && toolPrefix.isNotEmpty) {
+      _validateIdentifier(toolPrefix, '@Server(toolPrefix:)');
+    }
     return _ServerConfig(
       transport: _readTransport(reader),
       port: _peekInt(reader, 'port') ?? 3000,
       address: _peekString(reader, 'address') ?? '127.0.0.1',
-      toolPrefix: _peekString(reader, 'toolPrefix'),
+      toolPrefix: toolPrefix,
       autoClassPrefix: _peekBool(reader, 'autoClassPrefix') ?? false,
       generateJson: _peekBool(reader, 'generateJson') ?? false,
       generateMcp: _peekBool(reader, 'generateMcp') ?? true,
