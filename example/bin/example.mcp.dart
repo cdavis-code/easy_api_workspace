@@ -799,9 +799,11 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
   String _serializeResult(dynamic result) {
     if (result == null) return 'null';
     try {
+      if (result is Map) return jsonEncode(result);
       if (result is List) {
         final items = result.map((e) {
           if (e == null) return null;
+          if (e is Map) return e;
           final toJson = e.toJson;
           if (toJson != null && toJson is Function) return toJson();
           return e.toString();
