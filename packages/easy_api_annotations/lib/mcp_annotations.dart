@@ -271,6 +271,25 @@ class Server {
   /// Defaults to null (no server-wide annotation defaults).
   final ToolAnnotations? annotationsDefault;
 
+  /// Allowed CORS origins for HTTP transport.
+  ///
+  /// Only used when [transport] is [McpTransport.http] and [generateMcp] is `true`.
+  /// Controls which origins can make requests to the MCP server.
+  ///
+  /// For production deployments, restrict this to specific origins to prevent
+  /// CSRF attacks. For local development, ['*'] allows all origins.
+  ///
+  /// Example:
+  /// ```dart
+  /// @Server(
+  ///   transport: McpTransport.http,
+  ///   corsOrigins: ['https://myapp.example.com', 'https://admin.example.com'],
+  /// )
+  /// ```
+  ///
+  /// Defaults to ['*'] for backward compatibility.
+  final List<String> corsOrigins;
+
   /// Creates a server configuration annotation.
   ///
   /// [transport] determines the communication protocol (stdio or HTTP).
@@ -285,6 +304,7 @@ class Server {
   /// [codeModeTimeout] sets the max execution time for code mode scripts.
   /// [logErrors] controls whether internal errors are logged to stderr.
   /// [annotationsDefault] provides server-wide defaults for tool annotation hints.
+  /// [corsOrigins] specifies allowed CORS origins for HTTP transport (default: ['*']).
   const Server({
     this.transport = McpTransport.stdio,
     this.generateJson = false,
@@ -298,6 +318,7 @@ class Server {
     this.codeModeTimeout = 30,
     this.logErrors = false,
     this.annotationsDefault,
+    this.corsOrigins = const ['*'],
   });
 }
 
@@ -619,6 +640,21 @@ class Parameter {
   /// When provided, the parameter value must match this pattern.
   final String? pattern;
 
+  /// Maximum length for string parameters.
+  ///
+  /// When specified, the parameter value must not exceed this length.
+  /// Useful for preventing DoS attacks through extremely long strings.
+  ///
+  /// Example:
+  /// ```dart
+  /// @Parameter(
+  ///   description: 'Search query',
+  ///   maxLength: 1000,
+  /// )
+  /// String query,
+  /// ```
+  final int? maxLength;
+
   /// Whether this parameter should be marked as sensitive.
   ///
   /// Sensitive parameters (like passwords, API keys) are surfaced to downstream
@@ -647,6 +683,7 @@ class Parameter {
   /// [minimum] - Minimum allowed value for numeric types.
   /// [maximum] - Maximum allowed value for numeric types.
   /// [pattern] - Regular expression pattern for string validation.
+  /// [maxLength] - Maximum length for string parameters.
   /// [sensitive] - Whether this parameter contains sensitive data.
   /// [enumValues] - List of allowed values for enum-like parameters.
   const Parameter({
@@ -657,7 +694,139 @@ class Parameter {
     this.minimum,
     this.maximum,
     this.pattern,
+    this.maxLength,
     this.sensitive = false,
     this.enumValues,
+  });
+}
+
+/// Annotation to mark a method as an MCP prompt template.
+///
+/// Prompts are user-invoked templates that generate structured messages
+/// for interacting with language models. Unlike tools (which are model-called),
+/// prompts are explicitly selected by users (e.g., as slash commands).
+///
+/// A prompt method must return a [PromptResult] containing a list of
+/// [PromptMessage] objects. The method's parameters become the prompt's
+/// arguments, which users provide when invoking the prompt.
+///
+/// Example:
+/// ```dart
+/// class CodeReviewPrompts {
+///   @Prompt(
+///     title: 'Request Code Review',
+///     description: 'Asks the LLM to analyze code quality and suggest improvements',
+///   )
+///   PromptResult codeReview({
+///     @PromptArgument(
+///       title: 'Source Code',
+///       description: 'The code to review for quality and issues',
+///     )
+///     required String code,
+///   }) {
+///     return PromptResult(
+///       description: 'Code review prompt',
+///       messages: [
+///         PromptMessage(
+///           role: PromptRole.user,
+///           content: TextPromptContent(
+///             'Please review this code:\\n\\n```\\n$code\\n```',
+///           ),
+///         ),
+///       ],
+///     );
+///   }
+/// }
+/// ```
+@immutable
+class Prompt {
+  /// Custom name for this prompt.
+  ///
+  /// If provided, this name is used instead of the method name.
+  /// Must be unique within the MCP server.
+  final String? name;
+
+  /// Human-readable title for this prompt.
+  ///
+  /// Displayed in MCP clients (e.g., as a slash command label).
+  /// If not provided, the prompt name will be used.
+  final String? title;
+
+  /// Description of what this prompt does.
+  ///
+  /// Shown to users to help them understand when to use this prompt.
+  /// If not provided, the generator will use the method's dartdoc comment.
+  final String? description;
+
+  /// Creates a Prompt annotation.
+  ///
+  /// [name] - Optional custom name (defaults to method name).
+  /// [title] - Human-readable title displayed in MCP clients.
+  /// [description] - Explanation of the prompt's purpose.
+  const Prompt({this.name, this.title, this.description});
+}
+
+/// Annotation to provide rich metadata for individual arguments in a Prompt.
+///
+/// Use this annotation to customize how prompt arguments are presented
+/// to MCP clients, including human-readable titles, descriptions, and
+/// requirement status.
+///
+/// Example:
+/// ```dart
+/// @Prompt(description: 'Generate documentation for code')
+/// PromptResult documentCode({
+///   @PromptArgument(
+///     title: 'Source Code',
+///     description: 'The code to generate documentation for',
+///   )
+///   required String code,
+///
+///   @PromptArgument(
+///     title: 'Language',
+///     description: 'Programming language of the code',
+///     required: true,
+///   )
+///   String? language,
+/// }) {
+///   // ...
+/// }
+/// ```
+@immutable
+class PromptArgument {
+  /// Custom external name for this argument.
+  ///
+  /// When set, the [alias] is used as the argument name in the MCP protocol
+  /// instead of the Dart parameter name.
+  final String? alias;
+
+  /// Human-readable title for this argument.
+  ///
+  /// Displayed as the label in MCP clients. If not provided,
+  /// the argument name will be used.
+  final String? title;
+
+  /// Detailed description of what this argument represents.
+  ///
+  /// Provides context to help users understand what value to provide.
+  final String? description;
+
+  /// Whether this argument is required.
+  ///
+  /// If not provided, the generator infers requirement from Dart nullability:
+  /// non-nullable parameters are required, nullable parameters are optional.
+  final bool? required;
+
+  /// Creates a PromptArgument annotation.
+  ///
+  /// [alias] - Custom external name for this argument.
+  /// [title] - Human-readable title displayed in MCP clients.
+  /// [description] - Detailed explanation of the argument's purpose.
+  /// [required] - Whether this argument is required (default: inferred from nullability).
+  const PromptArgument({
+    this.alias,
+    this.title,
+    this.description,
+    this.required,
   });
 }

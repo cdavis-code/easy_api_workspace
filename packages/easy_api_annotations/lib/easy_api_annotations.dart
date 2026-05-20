@@ -9,3 +9,4 @@
 library;
 
 export 'mcp_annotations.dart';
+export 'prompt_types.dart';

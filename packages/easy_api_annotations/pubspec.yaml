@@ -1,6 +1,6 @@
 name: easy_api_annotations
 description: Dart annotations for exposing library methods as MCP tools.
-version: 1.0.0
+version: 1.1.0
 homepage: https://github.com/cdavis-code/easy_api_workspace/tree/main/packages/easy_api_annotations
 repository: https://github.com/cdavis-code/easy_api_workspace/tree/main/packages/easy_api_annotations
 issue_tracker: https://github.com/cdavis-code/easy_api_workspace/issues

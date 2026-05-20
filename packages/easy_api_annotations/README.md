@@ -1,7 +1,7 @@
 # easy_api_annotations
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/images/logo-banner.svg" width="400" alt="easy_api">
+  <img src="https://raw.githubusercontent.com/faithoflifedev/easy_api_workspace/refs/heads/main/images/logo-banner.svg" width="400" alt="easy_api">
 </p>
 
 Dart annotations for exposing library methods as MCP tools, REST APIs, or both.
@@ -20,11 +20,11 @@ Add this to your package's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  easy_api_annotations: ^0.6.0
+  easy_api_annotations: ^1.1.0
 
 dev_dependencies:
   build_runner: ^2.4.0
-  easy_api_generator: ^0.6.1
+  easy_api_generator: ^1.1.0
 ```
 
 > **Note:** This package provides only the annotations. You also need [`easy_api_generator`](https://pub.dev/packages/easy_api_generator) to generate the MCP server code from your annotated classes.
@@ -150,6 +150,7 @@ Future<User> createUser({
 | `minimum` | `num?` | `null` | Minimum value for numeric parameters |
 | `maximum` | `num?` | `null` | Maximum value for numeric parameters |
 | `pattern` | `String?` | `null` | Regular expression pattern for string validation |
+| `maxLength` | `int?` | `null` | Maximum length for string parameters (prevents DoS attacks) |
 | `sensitive` | `bool` | `false` | Whether this parameter contains sensitive data (may be masked in logs/UI) |
 | `enumValues` | `List<Object?>?` | `null` | List of allowed values (enum-like restriction) |
 
@@ -248,25 +249,145 @@ class UserService {
 }
 ```
 
-See the [example](https://github.com/cdavis-code/easy_api_workspace/tree/main/example) directory in the workspace root for a complete working example that demonstrates usage of both packages together.
+See the [example](https://github.com/faithoflifedev/easy_api_workspace/tree/main/example) directory in the workspace root for a complete working example that demonstrates usage of both packages together.
+
+### MCP Prompts
+
+MCP Prompts are user-invoked templates that generate structured messages for interacting with language models. Unlike tools (which are called by the model), prompts are explicitly selected by users (e.g., as slash commands in MCP clients).
+
+#### @Prompt Annotation
+
+```dart
+import 'package:easy_api_annotations/mcp_annotations.dart';
+import 'package:easy_api_annotations/prompt_types.dart';
+
+class CodeReviewPrompts {
+  @Prompt(
+    title: 'Request Code Review',
+    description: 'Asks the LLM to analyze code quality and suggest improvements',
+  )
+  PromptResult codeReview({
+    @PromptArgument(
+      title: 'Source Code',
+      description: 'The code to review for quality and issues',
+    )
+    required String code,
+  }) {
+    return PromptResult(
+      description: 'Code review prompt',
+      messages: [
+        PromptMessage(
+          role: PromptRole.user,
+          content: TextPromptContent(
+            'Please review this code:\n\n```\n$code\n```',
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+#### @Prompt Annotation Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | `String?` | `null` | Custom prompt name (defaults to method name) |
+| `title` | `String?` | `null` | Human-readable title displayed in MCP clients |
+| `description` | `String?` | `null` | Description shown to users (uses dartdoc if omitted) |
+
+#### @PromptArgument Annotation Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `alias` | `String?` | `null` | Custom external name for the argument |
+| `title` | `String?` | `null` | Human-readable title displayed in MCP clients |
+| `description` | `String?` | `null` | Detailed explanation of the argument's purpose |
+| `required` | `bool?` | `null` | Whether argument is required (inferred from Dart nullability if omitted) |
+
+#### Prompt Types
+
+The `prompt_types.dart` library provides the following types for building prompt results:
+
+- **`PromptResult`** — Return type for @Prompt methods, contains messages and optional description
+- **`PromptMessage`** — A single message with a role (user/assistant) and content
+- **`PromptRole`** — Enum with `user` and `assistant` values
+- **`PromptContent`** — Sealed base class for message content:
+  - `TextPromptContent` — Plain text messages
+  - `ImagePromptContent` — Base64-encoded images with MIME type
+  - `AudioPromptContent` — Base64-encoded audio with MIME type
+  - `ResourcePromptContent` — Embedded server resources with URI
+
+#### Multi-content Prompt Example
+
+```dart
+import 'dart:convert';
+import 'package:easy_api_annotations/mcp_annotations.dart';
+import 'package:easy_api_annotations/prompt_types.dart';
+
+class MultiModalPrompts {
+  @Prompt(
+    title: 'Analyze Image with Context',
+    description: 'Analyzes an image with additional textual context',
+  )
+  PromptResult analyzeImage({
+    @PromptArgument(
+      title: 'Image Path',
+      description: 'Path to the image file',
+    )
+    required String imagePath,
+    
+    @PromptArgument(
+      title: 'Analysis Question',
+      description: 'What should the LLM focus on?',
+    )
+    required String question,
+  }) {
+    // Load and encode image (example)
+    final imageBytes = File(imagePath).readAsBytesSync();
+    final base64Image = base64Encode(imageBytes);
+    
+    return PromptResult(
+      messages: [
+        PromptMessage(
+          role: PromptRole.user,
+          content: TextPromptContent('I need you to analyze this image:'),
+        ),
+        PromptMessage(
+          role: PromptRole.user,
+          content: ImagePromptContent(base64Image, 'image/png'),
+        ),
+        PromptMessage(
+          role: PromptRole.user,
+          content: TextPromptContent(question),
+        ),
+      ],
+    );
+  }
+}
+```
+
+See the [example](https://github.com/faithoflifedev/easy_api_workspace/tree/main/example) directory in the workspace root for a complete working example that demonstrates usage of both packages together.
 
 ## Features
 
 - Simple annotations for defining MCP servers, REST APIs, or both from a single class
 - `@Server`, `@Tool`, and `@Parameter` cover transport, tool metadata, and parameter-level validation
+- **MCP Prompts support** — `@Prompt` and `@PromptArgument` for user-invoked prompt templates with multi-modal content (text, image, audio, resources)
 - Support for both stdio (JSON-RPC) and HTTP transports
-- **Configurable HTTP server** — customize port and bind address
+- **Configurable HTTP server** — customize port, bind address, and CORS origins
 - **REST + OpenAPI 3.0 generation** via `generateRest: true` (independent of MCP generation)
-- **[Code Mode](https://github.com/cdavis-code/easy_api_workspace/blob/main/README.md#code-mode)** — optional Node.js sandbox for batch tool orchestration with per-tool opt-out
-- **Rich parameter metadata** — titles, descriptions, examples, validation (min/max, pattern, enum), sensitivity flags, and external name aliases
+- **[Code Mode](https://github.com/faithoflifedev/easy_api_workspace/blob/main/README.md#code-mode)** — optional Node.js sandbox for batch tool orchestration with per-tool opt-out
+- **Rich parameter metadata** — titles, descriptions, examples, validation (min/max, pattern, maxLength, enum), sensitivity flags, and external name aliases
 - **Flexible tool naming** — custom names, class-based auto prefixing, and tool prefixes
+- **Tool annotations** — behavioral hints (readOnlyHint, destructiveHint, idempotentHint, openWorldHint) for MCP clients
 - Backward-compatible `@Mcp` typedef for existing codebases
 - Compatible with `easy_api_generator` for automatic server code generation
 - Null safety compatible (Dart 3.9+)
 
 ## Contributing
 
-Contributions are welcome! Please read the [CONTRIBUTING.md](https://github.com/cdavis-code/easy_api_workspace/blob/main/CONTRIBUTING.md) guide at the root of the workspace for setup instructions, development workflow, coding standards, testing expectations, and the pull-request checklist before opening a PR.
+Contributions are welcome! Please read the [CONTRIBUTING.md](https://github.com/faithoflifedev/easy_api_workspace/blob/main/CONTRIBUTING.md) guide at the root of the workspace for setup instructions, development workflow, coding standards, testing expectations, and the pull-request checklist before opening a PR.
 
 ## License
 

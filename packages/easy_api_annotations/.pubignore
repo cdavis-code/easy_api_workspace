@@ -1,5 +1,6 @@
 .dart_tool/
 .packages
+doc/
 **/*.g.dart
 **/*.gr.dart
 **/*.freezed.dart

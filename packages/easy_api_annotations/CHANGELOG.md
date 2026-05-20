@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-05-20
+
+### Added
+- Added `@Prompt` annotation for marking methods as MCP prompt templates.
+  Prompts are user-invoked templates that generate structured messages for
+  interacting with language models (e.g., as slash commands).
+- Added `@PromptArgument` annotation for providing rich metadata on prompt
+  arguments, including custom names, titles, descriptions, and requirement status.
+- Added `PromptResult` class for returning prompt messages from @Prompt methods.
+- Added `PromptMessage` class representing a single message with a role and content.
+- Added `PromptRole` enum with `user` and `assistant` values.
+- Added sealed `PromptContent` class hierarchy:
+  - `TextPromptContent` for plain text messages
+  - `ImagePromptContent` for base64-encoded images
+  - `AudioPromptContent` for base64-encoded audio
+  - `ResourcePromptContent` for embedded server resources
+- Added comprehensive DartDoc comments with examples for all prompt types.
+
 ## [1.0.0] - 2026-05-08
 
 First stable release. The annotation surface is now considered API-stable;
