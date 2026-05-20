@@ -849,4 +849,158 @@ void main() {
       );
     });
   });
+
+  group('Security Features', () {
+    group('Node.js Sandbox Hardening', () {
+      test('generates sandbox with security flags', () {
+        final result = StdioTemplate.generate(
+          [],
+          codeMode: true,
+          codeModeTimeout: 30,
+        );
+
+        // Verify security flags are present
+        expect(result, contains('--no-addons'));
+        expect(result, contains('--frozen-intrinsics'));
+        expect(result, contains('--max-old-space-size=64'));
+      });
+    });
+
+    group('Input Validation', () {
+      test('prompt handlers include length validation', () {
+        final prompts = [
+          <String, dynamic>{
+            'name': 'codeReview',
+            'methodName': 'codeReview',
+            'title': 'Code Review',
+            'description': 'Review code',
+            'arguments': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'name': 'code',
+                'dartName': 'code',
+                'type': 'String',
+                'isNullable': false,
+                'isOptional': false,
+                'isNamed': true,
+                'required': true,
+              },
+            ],
+            'isAsync': false,
+            'className': 'ExamplePrompts',
+            'isStatic': false,
+            'sourceAlias': 'example_prompts',
+          },
+        ];
+
+        final result = StdioTemplate.generate([], prompts: prompts);
+
+        // Verify length validation is present
+        expect(result, contains('.length > 10000'));
+        expect(result, contains('exceeds maximum length of 10000 characters'));
+        // Verify try-catch block
+        expect(result, contains('try {'));
+        expect(result, contains('catch (e, st)'));
+        expect(
+          result,
+          contains('An error occurred while processing the prompt.'),
+        );
+      });
+
+      test('code mode execute handler validates code length', () {
+        final result = StdioTemplate.generate(
+          [],
+          codeMode: true,
+          codeModeTimeout: 30,
+        );
+
+        // Verify code length validation
+        expect(result, contains('.length > 10000'));
+        expect(result, contains('Code exceeds maximum length'));
+      });
+
+      test('search handler validates query length', () {
+        final result = StdioTemplate.generate(
+          [],
+          codeMode: true,
+          codeModeTimeout: 30,
+        );
+
+        // Verify query length validation - constant gets interpolated to 500
+        expect(result, contains('query.length > 500'));
+        expect(
+          result,
+          contains('Search query exceeds maximum length of 500 characters'),
+        );
+      });
+    });
+
+    group('CORS Configuration', () {
+      test('generates default CORS origins as wildcard', () {
+        final result = HttpTemplate.generate([], 3000, '127.0.0.1');
+
+        expect(result, contains("const _corsOrigins = <'*'>;"));
+        expect(result, contains('Access-Control-Allow-Origin'));
+      });
+
+      test('generates custom CORS origins when provided', () {
+        final result = HttpTemplate.generate(
+          [],
+          3000,
+          '127.0.0.1',
+          corsOrigins: [
+            'https://myapp.example.com',
+            'https://admin.example.com',
+          ],
+        );
+
+        expect(
+          result,
+          contains(
+            "const _corsOrigins = <'https://myapp.example.com', 'https://admin.example.com'>;",
+          ),
+        );
+      });
+    });
+
+    group('PORT Environment Variable', () {
+      test('uses int.tryParse for safe PORT parsing', () {
+        final result = HttpTemplate.generate([], 3000, '127.0.0.1');
+
+        // Verify safe parsing with fallback
+        expect(result, contains('int.tryParse(portEnv)'));
+        expect(result, contains('?? 3000'));
+      });
+    });
+
+    group('Process Shutdown', () {
+      test('uses graceful shutdown with SIGTERM before SIGKILL', () {
+        final result = StdioTemplate.generate(
+          [],
+          codeMode: true,
+          codeModeTimeout: 30,
+        );
+
+        // Verify graceful shutdown sequence
+        expect(result, contains('io.ProcessSignal.sigterm'));
+        expect(result, contains('io.ProcessSignal.sigkill'));
+        expect(result, contains('Duration(seconds: 2)'));
+      });
+    });
+
+    group('Temporary File Security', () {
+      test('sets restrictive file permissions on Unix systems', () {
+        final result = StdioTemplate.generate(
+          [],
+          codeMode: true,
+          codeModeTimeout: 30,
+        );
+
+        // Verify permission setting commands
+        expect(result, contains("chmod', ['700'"));
+        expect(result, contains("chmod', ['600'"));
+        expect(result, contains('io.Platform.isLinux'));
+        expect(result, contains('io.Platform.isMacOS'));
+      });
+    });
+  });
 }

@@ -6,11 +6,15 @@
 
 Build Runner generator that creates MCP server code, REST API servers, and OpenAPI 3.0 specs from annotated Dart classes.
 
-Processes Dart code annotated with the `easy_api_annotations` package to produce any combination of a ready-to-run MCP server (`.mcp.dart`), MCP metadata (`.mcp.json`), a Shelf-based REST server (`.openapi.dart`), and an OpenAPI 3.0 specification (`.openapi.json`):
+Processes Dart code annotated with the `easy_api_annotations` package to produce any combination of:
+- **MCP server** (`.mcp.dart`) — stdio or HTTP transport using `dart_mcp`
+- **MCP metadata** (`.mcp.json`) — tool/prompt schemas for AI clients
+- **REST API server** (`.openapi.dart`) — Shelf-based HTTP server
+- **OpenAPI 3.0 specification** (`.openapi.json`) — Swagger-compatible API docs
 
 - `@Server` — configures transport (stdio/HTTP), port/address, code mode, and which artifacts to generate.
 - `@Tool` — exposes a method as an MCP tool and/or REST endpoint, with optional custom naming, icons, and code-mode controls.
-- `@Parameter` *(optional)* — attaches rich metadata to individual parameters (titles, descriptions, examples, validation, sensitivity, external aliases). The generator infers parameter info from Dart types by default, so you only need `@Parameter` when you want richer metadata than the Dart signature already expresses.
+- `@Parameter` *(optional)* — attaches rich metadata to individual parameters (titles, descriptions, examples, validation constraints like `maxLength` and `pattern`, sensitivity, external aliases). The generator infers parameter info from Dart types by default, so you only need `@Parameter` when you want richer metadata than the Dart signature already expresses.
 
 > **Migration note:** `@Mcp` is still available as a deprecated typedef for backward compatibility. New code should use `@Server`.
 
@@ -20,11 +24,11 @@ Processes Dart code annotated with the `easy_api_annotations` package to produce
 
 ```yaml
 dependencies:
-  easy_api_annotations: ^1.0.0
+  easy_api_annotations: ^1.1.0
 
 dev_dependencies:
   build_runner: ^2.4.0
-  easy_api_generator: ^1.0.1
+  easy_api_generator: ^1.1.0
 ```
 
 ## Usage
@@ -295,6 +299,46 @@ This is useful for:
 - Organizing tools by domain (e.g., `user_`, `order_`, `admin_`)
 - Creating more descriptive names for MCP clients
 
+### MCP Prompts
+
+Prompts are parameterized templates that users can invoke explicitly (e.g., as slash commands) to generate structured LLM messages. Unlike tools (which are called by the model), prompts are selected by users.
+
+```dart
+@Server(transport: McpTransport.stdio)
+class MyPrompts {
+  @Prompt(
+    title: 'Code Review',
+    description: 'Analyzes code quality and suggests improvements',
+  )
+  PromptResult codeReview({
+    @PromptArgument(
+      title: 'Source Code',
+      description: 'The code to review',
+    )
+    required String code,
+  }) {
+    return PromptResult(
+      description: 'Code review prompt',
+      messages: [
+        PromptMessage(
+          role: PromptRole.user,
+          content: TextPromptContent(
+            'Please review this code:\n\n```\n$code\n```',
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+When prompts are detected, the generated server:
+- Declares `PromptsCapability` during initialization
+- Implements `prompts/list` to return available prompt templates with arguments
+- Implements `prompts/get` to execute the prompt method and convert `PromptResult` to MCP messages
+- Supports all content types: text, images, audio, and embedded resources
+- Includes prompts in `.mcp.json` metadata when generated
+
 2. Run the generator:
 
 ```bash
@@ -320,10 +364,16 @@ class MyServer { ... }
 - **Two transport modes** - stdio (JSON-RPC) and HTTP (Shelf-based) servers
 - **Configurable HTTP server** - Customize port and bind address via `@Server` annotation
 - **Automatic JSON-Schema generation** - Maps Dart types to proper JSON Schema
-- **Rich parameter metadata** - Use `@Parameter` annotation for titles, descriptions, validation
-- **Optional parameter support** - Handles named and optional positional parameters
+- **Rich parameter metadata** - Use `@Parameter` for titles, descriptions, validation (`maxLength`, `pattern`, `minimum`, `maximum`, `enumValues`)
+- **Input validation** - Automatic generation of length and pattern validation code to prevent DoS attacks
+- **MCP Prompts support** - Parameterized prompt templates with `@Prompt` and `@PromptArgument` annotations
+- **ToolAnnotations** - Behavioral hints for MCP clients (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`)
+- **Code Mode** - Node.js sandbox for batch tool orchestration with resource limits
+- **Configurable CORS** - Restrict HTTP origins via `corsOrigins` parameter
+- **Optional parameter support** - Handles named and optional positional parameters with default values
 - **Doc comment extraction** - Uses function doc comments when `@Tool.description` not provided
 - **Dynamic method dispatch** - Generated `_dispatch` function routes to actual tool methods
+- **Security features** - Identifier validation, ReDoS prevention, graceful process shutdown, secure temp file permissions
 
 ## Example
 
@@ -332,9 +382,18 @@ See the [example](https://github.com/cdavis-code/easy_api_workspace/tree/main/ex
 ## Generated Server Capabilities
 
 The generated MCP server supports:
-- `initialize` - Standard MCP initialization
-- `tools/list` - Returns list of available tools with schemas
+- `initialize` - Standard MCP initialization with capability negotiation
+- `tools/list` - Returns list of available tools with JSON Schema definitions
 - `tools/call` - Executes the requested tool with provided arguments
+- `prompts/list` - Returns available prompt templates with argument metadata (when prompts are defined)
+- `prompts/get` - Executes a prompt template and returns structured LLM messages (when prompts are defined)
+
+The generated REST server (when `generateRest: true`) provides:
+- RESTful endpoint mapping following OpenAPI 3.0 specification
+- Resource-based URL patterns (e.g., `/users`, `/users/{id}`)
+- Proper HTTP status codes (200, 201, 204, 400, 404)
+- Request/response schema validation
+- Swagger/OpenAPI compatible `.openapi.json` output
 
 ## Security & Operational Caveats
 

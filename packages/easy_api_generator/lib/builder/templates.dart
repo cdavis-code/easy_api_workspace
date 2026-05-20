@@ -45,8 +45,20 @@ String _escapeDartString(String s) {
   return s
       .replaceAll('\\', '\\\\')
       .replaceAll("'", "\\'")
+      .replaceAll('\n', '\\n')
+      .replaceAll('\r', '\\r')
+      .replaceAll('\t', '\\t')
       .replaceAll('\$', '\\\$');
 }
+
+/// Maximum allowed length for code mode scripts to prevent abuse.
+const _maxCodeModeLength = 10000;
+
+/// Maximum allowed length for search queries to prevent DoS.
+const _maxSearchQueryLength = 500;
+
+/// Maximum allowed length for prompt arguments to prevent abuse.
+const _maxPromptArgumentLength = 10000;
 
 /// Converts a Dart type string to a JavaScript/JSON Schema type string.
 String _jsType(String dartType) {
@@ -132,11 +144,19 @@ String _generateToolSpecRegistry(List<Map<String, dynamic>> codeModeTools) {
 
 /// Generates the _search handler method.
 String _generateSearchHandler() {
-  return r'''
+  return '''
   FutureOr<CallToolResult> _search(CallToolRequest request) async {
     try {
       final query = (request.arguments?['query'] as String?) ?? '';
       final detailLevel = (request.arguments?['detail_level'] as String?) ?? 'brief';
+
+      // Validate query length
+      if (query.length > $_maxSearchQueryLength) {
+        return CallToolResult(
+          content: [TextContent(text: 'Search query exceeds maximum length of $_maxSearchQueryLength characters.')],
+          isError: true,
+        );
+      }
 
       final terms = query.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
 
@@ -182,7 +202,7 @@ String _generateSearchHandler() {
       );
     } catch (e, st) {
       if (_logErrors) {
-        io.stderr.writeln('[easy_api] _search: $e');
+        io.stderr.writeln('[easy_api] _search: \$e');
         io.stderr.writeln(st);
         await io.stderr.flush();
       }
@@ -223,7 +243,7 @@ String _generateSearchHandler() {
     }
   }
   // ignore: prefer_adjacent_string_concatenation
-  '''; // raw string — _logErrors referenced as-is in generated code
+  ''';
 }
 
 /// Generates the _execute handler method.
@@ -232,6 +252,15 @@ String _generateExecuteHandler(int codeModeTimeout) {
   FutureOr<CallToolResult> _execute(CallToolRequest request) async {
     try {
       final code = request.arguments!['code'] as String;
+      
+      // Validate code length to prevent abuse
+      if (code.length > $_maxCodeModeLength) {
+        return CallToolResult(
+          content: [TextContent(text: 'Code exceeds maximum length of $_maxCodeModeLength characters.')],
+          isError: true,
+        );
+      }
+      
       final result = await _runCodeSandbox(code, $codeModeTimeout);
       return CallToolResult(
         content: [TextContent(text: result ?? 'null')],
@@ -260,11 +289,24 @@ String _generateRunCodeSandbox() {
       final wrapper = _buildJsWrapper(userCode);
       tempDir = await io.Directory.systemTemp.createTemp('mcp_code_mode_');
       final scriptFile = io.File('\${tempDir.path}/sandbox.js');
+            
+      // Set restrictive permissions (owner read/write only)
+      if (io.Platform.isLinux || io.Platform.isMacOS) {
+        await scriptFile.create(recursive: true);
+        await io.Process.run('chmod', ['700', tempDir.path]);
+        await io.Process.run('chmod', ['600', scriptFile.path]);
+      }
+            
       await scriptFile.writeAsString(wrapper);
 
       process = await io.Process.start(
         'node',
-        ['--max-old-space-size=64', scriptFile.path],
+        [
+          '--max-old-space-size=64',
+          '--no-addons',
+          '--frozen-intrinsics',
+          scriptFile.path,
+        ],
       );
     } catch (e) {
       await tempDir?.delete(recursive: true);
@@ -340,7 +382,40 @@ String _generateRunCodeSandbox() {
 
       return result;
     } finally {
-      process?.kill(io.ProcessSignal.sigkill);
+      // Graceful shutdown: check if process already exited, then SIGTERM → SIGKILL
+      if (process != null) {
+        try {
+          // First, check if process already exited naturally
+          await process.exitCode.timeout(
+            const Duration(milliseconds: 100),
+          );
+        } catch (_) {
+          // Process still running, begin graceful shutdown
+          process.kill(io.ProcessSignal.sigterm);
+          try {
+            // Wait up to 2 seconds for graceful shutdown
+            await process.exitCode.timeout(
+              const Duration(seconds: 2),
+              onTimeout: () {
+                // Process didn't exit, force kill
+                try {
+                  process?.kill(io.ProcessSignal.sigkill);
+                } catch (_) {
+                  // Process may have just exited - ignore
+                }
+                return -1;
+              },
+            );
+          } catch (_) {
+            // Error during exit code wait - attempt force kill as fallback
+            try {
+              process?.kill(io.ProcessSignal.sigkill);
+            } catch (_) {
+              // Process already dead - ignore
+            }
+          }
+        }
+      }
       await tempDir?.delete(recursive: true);
     }
   }''';
@@ -529,6 +604,69 @@ String _renderMcpParamExtraction(Map<String, dynamic> p, String dartType) {
   return "    final $paramName = request.arguments?['$externalName'] as $nullableCast;";
 }
 
+/// Generates validation code for a parameter if it has validation constraints.
+///
+/// Returns validation code string or empty string if no validation needed.
+String _renderParamValidation(Map<String, dynamic> p) {
+  final paramName = p['name'] as String;
+  final isOptional = p['isOptional'] == true;
+  final metadata = p['parameterMetadata'] as Map<String, dynamic>?;
+
+  if (metadata == null) return '';
+
+  final validations = <String>[];
+
+  // String length validation
+  if (metadata.containsKey('maxLength')) {
+    final maxLength = metadata['maxLength'] as int;
+    if (isOptional) {
+      validations.add(
+        '    if ($paramName != null && $paramName.length > $maxLength) {\n'
+        '      return CallToolResult(\n'
+        "        content: [TextContent(text: 'Parameter $paramName exceeds maximum length of $maxLength characters.')],\n"
+        '        isError: true,\n'
+        '      );\n'
+        '    }',
+      );
+    } else {
+      validations.add(
+        '    if ($paramName.length > $maxLength) {\n'
+        '      return CallToolResult(\n'
+        "        content: [TextContent(text: 'Parameter $paramName exceeds maximum length of $maxLength characters.')],\n"
+        '        isError: true,\n'
+        '      );\n'
+        '    }',
+      );
+    }
+  }
+
+  // Pattern validation for strings
+  if (metadata.containsKey('pattern')) {
+    final pattern = metadata['pattern'] as String;
+    if (isOptional) {
+      validations.add(
+        '    if ($paramName != null && !RegExp(r\'$pattern\').hasMatch($paramName)) {\n'
+        '      return CallToolResult(\n'
+        "        content: [TextContent(text: 'Parameter $paramName does not match required pattern.')],\n"
+        '        isError: true,\n'
+        '      );\n'
+        '    }',
+      );
+    } else {
+      validations.add(
+        '    if (!RegExp(r\'$pattern\').hasMatch($paramName)) {\n'
+        '      return CallToolResult(\n'
+        "        content: [TextContent(text: 'Parameter $paramName does not match required pattern.')],\n"
+        '        isError: true,\n'
+        '      );\n'
+        '    }',
+      );
+    }
+  }
+
+  return validations.isEmpty ? '' : validations.join('\n');
+}
+
 // ---------------------------------------------------------------------------
 // StdioTemplate
 // ---------------------------------------------------------------------------
@@ -543,6 +681,160 @@ String _renderMcpParamExtraction(Map<String, dynamic> p, String dartType) {
 ///
 /// The stdio transport is the default and recommended for local CLI tools
 /// that communicate via stdin/stdout streams.
+
+/// Generates prompt spec constants for each prompt.
+String _generatePromptSpecs(List<Map<String, dynamic>> prompts) {
+  final specs = prompts
+      .map((p) {
+        final name = p['name'] as String;
+        final title = p['title'] as String?;
+        final description = p['description'] as String;
+        final arguments = p['arguments'] as List<Map<String, dynamic>>;
+
+        final argsList = arguments
+            .map((arg) {
+              final argName = arg['name'] as String;
+              final argTitle = arg['title'] as String?;
+              final argDesc = arg['description'] as String?;
+              final argRequired = arg['required'] as bool;
+
+              var argStr =
+                  'PromptArgument(name: \'$argName\', required: $argRequired)';
+              if (argTitle != null || argDesc != null) {
+                final titlePart = argTitle != null
+                    ? 'title: \'${_escapeDartString(argTitle)}\''
+                    : '';
+                final descPart = argDesc != null
+                    ? 'description: \'${_escapeDartString(argDesc)}\''
+                    : '';
+                argStr =
+                    'PromptArgument(name: \'$argName\', $titlePart, $descPart, required: $argRequired)';
+              }
+              return argStr;
+            })
+            .join(',\n          ');
+
+        var promptStr =
+            'static final _prompt${name}Spec = Prompt(name: \'$name\', description: \'${_escapeDartString(description)}\'';
+        if (title != null) {
+          promptStr =
+              'static final _prompt${name}Spec = Prompt(name: \'$name\', title: \'${_escapeDartString(title)}\', description: \'${_escapeDartString(description)}\'';
+        }
+        if (arguments.isNotEmpty) {
+          promptStr +=
+              ',\n        arguments: [\n          $argsList,\n        ]';
+        }
+        promptStr += ');';
+        return promptStr;
+      })
+      .join('\n\n');
+
+  return specs;
+}
+
+/// Generates prompt handler methods for prompts/list and prompts/get.
+String _generatePromptHandlers(List<Map<String, dynamic>> prompts) {
+  // Generate prompt implementation methods
+  final promptImpls = prompts
+      .map((p) {
+        final name = p['name'] as String;
+        final methodName = p['methodName'] as String;
+        final className = p['className'] as String?;
+        final isStatic = p['isStatic'] as bool? ?? false;
+        final isAsync = p['isAsync'] as bool;
+        final sourceAlias = p['sourceAlias'] as String? ?? 'lib';
+        final arguments = p['arguments'] as List<Map<String, dynamic>>;
+
+        // Extract arguments for the function call with validation
+        final argExtractions = arguments
+            .map((arg) {
+              final argName = arg['name'] as String;
+              final dartName = arg['dartName'] as String;
+              return """    final $dartName = request.arguments?['$argName'] as String?;
+    if ($dartName != null && $dartName.length > $_maxPromptArgumentLength) {
+      throw ArgumentError('Argument $argName exceeds maximum length of $_maxPromptArgumentLength characters');
+    }""";
+            })
+            .join('\n');
+
+        final argCalls = arguments
+            .map((arg) {
+              final dartName = arg['dartName'] as String;
+              final isNamed = arg['isNamed'] as bool;
+              return isNamed ? '$dartName: $dartName ?? \'\'' : dartName;
+            })
+            .join(', ');
+
+        String call;
+        if (className != null && isStatic) {
+          call = isAsync
+              ? 'await $sourceAlias.$className.$methodName($argCalls)'
+              : '$sourceAlias.$className.$methodName($argCalls)';
+        } else if (className != null) {
+          call = isAsync
+              ? 'await $sourceAlias.$className().$methodName($argCalls)'
+              : '$sourceAlias.$className().$methodName($argCalls)';
+        } else {
+          call = isAsync
+              ? 'await $sourceAlias.$methodName($argCalls)'
+              : '$sourceAlias.$methodName($argCalls)';
+        }
+
+        return """  FutureOr<GetPromptResult> _prompt${name}Impl(GetPromptRequest request) async {
+    try {
+    $argExtractions
+    final promptResult = $call;
+    return GetPromptResult(
+      description: promptResult.description,
+      messages: promptResult.messages.map(_promptMessageToMcp).toList(),
+    );
+    } catch (e, st) {
+      if (_logErrors) {
+        io.stderr.writeln('[easy_api] prompt $name: \$e');
+        io.stderr.writeln(st);
+        await io.stderr.flush();
+      }
+      return GetPromptResult(
+        description: 'An error occurred while processing the prompt.',
+        messages: [],
+      );
+    }
+  }""";
+      })
+      .join('\n\n');
+
+  return '''
+$promptImpls
+
+  PromptMessage _promptMessageToMcp(easy_api.PromptMessage message) {
+    final content = message.content;
+    return switch (content) {
+      easy_api.TextPromptContent() => PromptMessage(
+          role: message.role == easy_api.PromptRole.user ? Role.user : Role.assistant,
+          content: TextContent(text: content.text),
+        ),
+      easy_api.ImagePromptContent() => PromptMessage(
+          role: message.role == easy_api.PromptRole.user ? Role.user : Role.assistant,
+          content: ImageContent(data: content.data, mimeType: content.mimeType),
+        ),
+      easy_api.AudioPromptContent() => PromptMessage(
+          role: message.role == easy_api.PromptRole.user ? Role.user : Role.assistant,
+          content: AudioContent(data: content.data, mimeType: content.mimeType),
+        ),
+      easy_api.ResourcePromptContent() => PromptMessage(
+          role: message.role == easy_api.PromptRole.user ? Role.user : Role.assistant,
+          content: EmbeddedResource(
+            resource: TextResourceContents(
+              uri: content.uri,
+              mimeType: content.mimeType,
+              text: content.text,
+            ),
+          ),
+        ),
+    };
+  }''';
+}
+
 class StdioTemplate {
   /// Generates the stdio server Dart code.
   ///
@@ -557,6 +849,7 @@ class StdioTemplate {
     bool codeMode = false,
     int codeModeTimeout = 30,
     bool logErrors = false,
+    List<Map<String, dynamic>> prompts = const [],
   }) {
     // Collect unique imports for custom List inner types
     final listInnerImports = _collectListInnerImports(tools);
@@ -573,6 +866,16 @@ class StdioTemplate {
         sourceImports[sourceImport] = sourceAlias;
       }
     }
+
+    // Also collect source imports from prompts
+    for (final prompt in prompts) {
+      final sourceImport = prompt['sourceImport'] as String?;
+      final sourceAlias = prompt['sourceAlias'] as String?;
+      if (sourceImport != null && sourceAlias != null) {
+        sourceImports[sourceImport] = sourceAlias;
+      }
+    }
+
     final sourceImportStatements = sourceImports.entries
         .map((e) => "import '${e.key}' as ${e.value};")
         .join('\n');
@@ -634,6 +937,12 @@ class StdioTemplate {
               })
               .join('\n');
 
+          // Generate validation code for parameters
+          final paramValidations = params
+              .map((p) => _renderParamValidation(p))
+              .where((v) => v.isNotEmpty)
+              .join('\n');
+
           // Generate conversion code for List parameters with custom inner types
           final paramConversions = params
               .where((p) => _needsListConversion(p['type'] as String))
@@ -674,6 +983,7 @@ class StdioTemplate {
   FutureOr<CallToolResult> _$name(CallToolRequest request) async {
     try {
 $paramExtractions
+$paramValidations
 $paramConversions
       final result = $call;
       return CallToolResult(
@@ -702,6 +1012,20 @@ $paramConversions
         : '';
     final logErrorsConstant = '  static const bool _logErrors = $logErrors;';
 
+    // Generate prompt support
+    final hasPrompts = prompts.isNotEmpty;
+    final promptAddCalls = hasPrompts
+        ? prompts
+              .map((p) {
+                final name = p['name'] as String;
+                return '    addPrompt(_prompt${name}Spec, _prompt${name}Impl);';
+              })
+              .join('\n')
+        : '';
+    final promptRegistrations = hasPrompts ? '\n$promptAddCalls' : '';
+    final promptSpecs = hasPrompts ? _generatePromptSpecs(prompts) : '';
+    final promptHandlers = hasPrompts ? _generatePromptHandlers(prompts) : '';
+
     return '''
 // Generated MCP stdio server
 // DO NOT EDIT - automatically generated by mcp_generator
@@ -712,6 +1036,7 @@ import 'dart:io' as io;
 
 import 'package:dart_mcp/server.dart';
 import 'package:dart_mcp/stdio.dart';
+import 'package:easy_api_annotations/easy_api_annotations.dart' as easy_api;
 
 $listInnerImportStatements
 $sourceImportStatements
@@ -723,7 +1048,7 @@ Future<void> main() async {
   await server.done;
 }
 
-base class MCPServerWithTools extends MCPServer with ToolsSupport {
+base class MCPServerWithTools extends MCPServer with ToolsSupport${hasPrompts ? ', PromptsSupport' : ''} {
 $logErrorsConstant
 
   MCPServerWithTools(super.channel)
@@ -734,7 +1059,7 @@ $logErrorsConstant
         ),
         instructions: 'Auto-generated MCP server',
       ) {
-$toolRegistrations$codeModeRegistrations
+$toolRegistrations$codeModeRegistrations$promptRegistrations
   }
 
   /// Guards against duplicate initialization requests (e.g. from MCP Inspector
@@ -754,6 +1079,8 @@ $toolRegistrations$codeModeRegistrations
 $toolHandlers
 $codeModeSpecRegistry
 $codeModeHandlers
+$promptSpecs
+$promptHandlers
 
   String _serializeResult(dynamic result) {
     if (result == null) return 'null';
@@ -905,6 +1232,7 @@ class HttpTemplate {
   /// [address] - The bind address (e.g., '127.0.0.1', '0.0.0.0')
   /// [codeMode] - Enable code mode with JavaScript sandbox (default: false)
   /// [codeModeTimeout] - Timeout for code mode execution in seconds (default: 30)
+  /// [corsOrigins] - Allowed CORS origins (default: ['*'] for backward compatibility)
   ///
   /// Returns the complete server code as a Dart string.
   static String generate(
@@ -914,6 +1242,8 @@ class HttpTemplate {
     bool codeMode = false,
     int codeModeTimeout = 30,
     bool logErrors = false,
+    List<Map<String, dynamic>> prompts = const [],
+    List<String> corsOrigins = const ['*'],
   }) {
     // Collect unique imports for custom List inner types
     final listInnerImports = _collectListInnerImports(tools);
@@ -935,6 +1265,16 @@ class HttpTemplate {
         sourceImports[sourceImport] = sourceAlias;
       }
     }
+
+    // Also collect source imports from prompts
+    for (final prompt in prompts) {
+      final sourceImport = prompt['sourceImport'] as String?;
+      final sourceAlias = prompt['sourceAlias'] as String?;
+      if (sourceImport != null && sourceAlias != null) {
+        sourceImports[sourceImport] = sourceAlias;
+      }
+    }
+
     final sourceImportStatements = sourceImports.entries
         .map((e) => "import '${e.key}' as ${e.value};")
         .join('\n');
@@ -996,6 +1336,12 @@ class HttpTemplate {
               })
               .join('\n');
 
+          // Generate validation code for parameters
+          final paramValidations = params
+              .map((p) => _renderParamValidation(p))
+              .where((v) => v.isNotEmpty)
+              .join('\n');
+
           // Generate conversion code for List parameters with custom inner types
           final paramConversions = params
               .where((p) => _needsListConversion(p['type'] as String))
@@ -1036,6 +1382,7 @@ class HttpTemplate {
   FutureOr<CallToolResult> _$name(CallToolRequest request) async {
     try {
 $paramExtractions
+$paramValidations
 $paramConversions
       final result = $call;
       return CallToolResult(
@@ -1069,6 +1416,25 @@ $paramConversions
         : '';
     final logErrorsConstant = '  static const bool _logErrors = $logErrors;';
 
+    // Generate prompt support
+    final hasPrompts = prompts.isNotEmpty;
+    final promptAddCalls = hasPrompts
+        ? prompts
+              .map((p) {
+                final name = p['name'] as String;
+                return '    addPrompt(_prompt${name}Spec, _prompt${name}Impl);';
+              })
+              .join('\n')
+        : '';
+    final promptRegistrations = hasPrompts ? '\n$promptAddCalls' : '';
+    final promptSpecs = hasPrompts ? _generatePromptSpecs(prompts) : '';
+    final promptHandlers = hasPrompts ? _generatePromptHandlers(prompts) : '';
+
+    // Generate CORS headers based on configuration
+    final corsOriginHeader = corsOrigins.contains('*')
+        ? "<String>['*']"
+        : "<String>[${corsOrigins.map((o) => "'${_escapeDartString(o)}'").join(', ')}]";
+
     return '''
 // Generated MCP HTTP server
 // DO NOT EDIT - automatically generated by mcp_generator
@@ -1081,9 +1447,15 @@ import 'package:dart_mcp/server.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:stream_channel/stream_channel.dart';
+import 'package:easy_api_annotations/easy_api_annotations.dart' as easy_api;
 
 $listInnerImportStatements
 $sourceImportStatements
+
+/// Allowed CORS origins for this server.
+/// Configured via @Server annotation. Defaults to ['*'] for backward compatibility.
+/// For production use, restrict to specific origins to prevent CSRF attacks.
+const _corsOrigins = $corsOriginHeader;
 
 Future<void> main() async {
   // Create stream controllers for bidirectional communication
@@ -1115,8 +1487,11 @@ Future<void> main() async {
     }
   });
 
-  const corsHeaders = <String, String>{
-    'Access-Control-Allow-Origin': '*',
+  // Pre-compute the CORS origin header value
+  final corsOriginValue = _corsOrigins.length == 1 ? _corsOrigins.first : _corsOrigins.join(', ');
+
+  final corsHeaders = <String, String>{
+    'Access-Control-Allow-Origin': corsOriginValue,
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers':
         'Content-Type, Accept, Mcp-Session-Id, Authorization',
@@ -1211,7 +1586,10 @@ Future<void> main() async {
   }
 
   // Use PORT env var (Cloud Run) or fall back to configured port
-  final serverPort = int.parse(io.Platform.environment['PORT'] ?? '$port');
+  final portEnv = io.Platform.environment['PORT'];
+  final serverPort = portEnv != null 
+      ? int.tryParse(portEnv) ?? $port 
+      : $port;
 
   final httpServer = await shelf_io.serve(
     handleRequest,
@@ -1231,7 +1609,7 @@ Future<void> main() async {
   }
 }
 
-base class MCPServerWithTools extends MCPServer with ToolsSupport {
+base class MCPServerWithTools extends MCPServer with ToolsSupport${hasPrompts ? ', PromptsSupport' : ''} {
 $logErrorsConstant
 
   MCPServerWithTools(super.channel)
@@ -1242,7 +1620,7 @@ $logErrorsConstant
         ),
         instructions: 'Auto-generated MCP server on port $port',
       ) {
-$toolRegistrations$codeModeRegistrations
+$toolRegistrations$codeModeRegistrations$promptRegistrations
   }
 
   /// Guards against duplicate initialization requests (e.g. from MCP Inspector
@@ -1262,6 +1640,8 @@ $toolRegistrations$codeModeRegistrations
 $toolHandlers
 $codeModeSpecRegistry
 $codeModeHandlers
+$promptSpecs
+$promptHandlers
 
   String _serializeResult(dynamic result) {
     if (result == null) return 'null';

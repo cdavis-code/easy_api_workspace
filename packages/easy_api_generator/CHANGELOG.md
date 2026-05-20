@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-05-20
+
+### Added
+- Added MCP Prompts support — the third MCP capability alongside Tools and Resources.
+  Servers can now expose parameterized prompt templates that users invoke explicitly
+  (e.g., as slash commands) to generate structured LLM messages.
+- Added `@Prompt` and `@PromptArgument` annotation extraction in the builder.
+  Prompts are extracted from annotated methods alongside tools, with full support
+  for argument metadata (custom names, titles, descriptions, requirement status).
+- Generated servers now declare `PromptsCapability` when prompts are present,
+  enabling the `prompts/list` and `prompts/get` JSON-RPC methods.
+- Generated prompt handlers automatically:
+  - Return prompt metadata with arguments for `prompts/list`
+  - Call the user's prompt method and convert `PromptResult` to MCP messages for `prompts/get`
+  - Support all content types: text, image, audio, and embedded resources
+- `.mcp.json` metadata now includes a `prompts` array when prompts are defined,
+  with name, title, description, and arguments for each prompt.
+- Added example prompt class in `example/lib/src/example_prompts.dart` demonstrating
+  code review, documentation generation, and code explanation prompts.
+
+### Security
+
+#### Critical
+- **Node.js Sandbox Hardening**: Added `--no-addons` and `--frozen-intrinsics` flags to code mode sandbox execution. Prevents native module loading and prototype pollution attacks in the JavaScript sandbox environment.
+- **Prompt Argument Validation**: Added 10,000 character length limit on prompt argument values with proper error handling. Prevents potential denial-of-service through excessively long inputs. All prompt handlers now include try-catch blocks with generic error messages.
+- **Temporary File Security**: Set restrictive file permissions (700 for directories, 600 for files) on Linux/macOS systems. Prevents other users from reading sandbox code and tool information from temporary files.
+
+#### High  
+- **Input Length Validation**: Added maximum length limits across all inputs:
+  - Tool names: 64 characters
+  - Tool descriptions: 500 characters
+  - Prompt arguments: 1,000 characters
+  - Code mode JavaScript: 10,000 characters
+  - Search queries: 500 characters
+  
+- **Regex Pattern Validation (ReDoS Prevention)**: Added validation for `@Parameter(pattern:)` values to prevent Regular Expression Denial of Service attacks. Detects:
+  - Nested quantifiers: `(a+)+`, `(a*)*`
+  - Overlapping alternation: `(a|a)+`
+  - Catastrophic backtracking via timeout testing (100ms threshold)
+
+#### Medium
+- **Configurable CORS Origins**: Added `corsOrigins` parameter to `@Server` annotation for HTTP transport. Defaults to `['*']` for backward compatibility. Production deployments can now restrict to specific origins to prevent CSRF attacks.
+- **Safe PORT Parsing**: Changed PORT environment variable parsing from `int.parse()` to `int.tryParse()` with fallback to configured port. Prevents server crashes from malformed PORT values.
+- **Graceful Process Shutdown**: Changed Node.js sandbox termination from immediate SIGKILL to graceful SIGTERM with 2-second timeout before SIGKILL. Allows proper cleanup and prevents orphaned processes.
+- **Generator Bug Fixes**: Fixed critical template bugs causing compilation errors in generated servers:
+  - Invalid CORS origin syntax (`<'*'>` → `<String>['*']`)
+  - Const expression violation in CORS headers
+  - Null safety violation in code mode process shutdown
+  - Missing imports for prompt source files
+
+### Tests
+- Added 13 comprehensive security tests covering:
+  - Node.js sandbox security flags
+  - Input length validation for prompts, code mode, and search
+  - CORS configuration (default and custom origins)
+  - PORT environment variable safe parsing
+  - Graceful process shutdown sequence
+  - Temporary file permission setting
+  - ReDoS pattern detection and rejection
+
+### Fixed
+- Fixed linter issues in templates:
+  - Removed unused variables and constants
+  - Fixed string quote style (double quotes → single quotes)
+  - Fixed unused `escapedPattern` variable in validation code
+
 ## [1.0.2] - 2026-05-20
 
 ### Fixed

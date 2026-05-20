@@ -70,4 +70,65 @@ void main() {
       expect(result, equals('Schema.object()'));
     });
   });
+
+  group('SchemaBuilder ReDoS Prevention', () {
+    test('rejects nested quantifiers pattern', () {
+      expect(
+        () => SchemaBuilder.buildObjectSchema([
+          {
+            'name': 'pattern',
+            'type': 'String',
+            'isOptional': true,
+            'parameterMetadata': {'pattern': '(a+)+'},
+          },
+        ]),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('rejects nested star quantifiers', () {
+      expect(
+        () => SchemaBuilder.buildObjectSchema([
+          {
+            'name': 'pattern',
+            'type': 'String',
+            'isOptional': true,
+            'parameterMetadata': {'pattern': '(a*)*'},
+          },
+        ]),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('accepts safe pattern', () {
+      final result = SchemaBuilder.buildObjectSchema([
+        {
+          'name': 'email',
+          'type': 'String',
+          'isOptional': true,
+          'parameterMetadata': {
+            'pattern': r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+          },
+        },
+      ]);
+
+      expect(result, contains('pattern:'));
+      // The pattern gets escaped, so just verify it's present
+      expect(result, contains('a-zA-Z0-9._%+-'));
+      expect(result, contains('@'));
+    });
+
+    test('accepts simple pattern without quantifiers', () {
+      final result = SchemaBuilder.buildObjectSchema([
+        {
+          'name': 'code',
+          'type': 'String',
+          'isOptional': true,
+          'parameterMetadata': {'pattern': r'^[A-Z]{2}\d{5}$'},
+        },
+      ]);
+
+      expect(result, contains('pattern:'));
+    });
+  });
 }

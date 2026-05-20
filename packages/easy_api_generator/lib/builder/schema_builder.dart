@@ -152,14 +152,26 @@ class SchemaBuilder {
 
     // Add title if present
     if (metadata['title'] != null) {
-      params.add("title: '${_escapeString(metadata['title'] as String)}'");
+      final title = metadata['title'] as String;
+      if (title.length > 200) {
+        throw ArgumentError(
+          'Parameter title exceeds maximum length of 200 characters '
+          '(got ${title.length} characters)',
+        );
+      }
+      params.add("title: '${_escapeString(title)}'");
     }
 
     // Add description if present
     if (metadata['description'] != null) {
-      params.add(
-        "description: '${_escapeString(metadata['description'] as String)}'",
-      );
+      final description = metadata['description'] as String;
+      if (description.length > 1000) {
+        throw ArgumentError(
+          'Parameter description exceeds maximum length of 1000 characters '
+          '(got ${description.length} characters)',
+        );
+      }
+      params.add("description: '${_escapeString(description)}'");
     }
 
     // Note: 'example' from @Parameter is not passed to Schema constructors
@@ -174,9 +186,11 @@ class SchemaBuilder {
       params.add('max: ${metadata['maximum']}');
     }
 
-    // Add pattern for string types
+    // Add pattern for string types with ReDoS validation
     if (metadata['pattern'] != null) {
-      params.add("pattern: '${_escapeString(metadata['pattern'] as String)}'");
+      final pattern = metadata['pattern'] as String;
+      _validateRegexPattern(pattern);
+      params.add("pattern: '${_escapeString(pattern)}'");
     }
 
     // Add enum values if present
@@ -184,7 +198,15 @@ class SchemaBuilder {
       final enumValues = metadata['enumValues'] as List;
       final enumStr = enumValues
           .map((v) {
-            if (v is String) return "'${_escapeString(v)}'";
+            if (v is String) {
+              if (v.length > 200) {
+                throw ArgumentError(
+                  'Enum value exceeds maximum length of 200 characters '
+                  '(got ${v.length} characters): ${v.substring(0, 50)}...',
+                );
+              }
+              return "'${_escapeString(v)}'";
+            }
             return v.toString();
           })
           .join(', ');
@@ -201,14 +223,66 @@ class SchemaBuilder {
     return buffer.toString();
   }
 
+  /// Validates a regex pattern to prevent ReDoS (Regular Expression Denial of Service) attacks.
+  /// Throws [ArgumentError] if the pattern is potentially vulnerable.
+  static void _validateRegexPattern(String pattern) {
+    // Check for common ReDoS patterns
+    // 1. Nested quantifiers: (a+)+, (a*)*, (a+){1,}
+    if (RegExp(r'\([^)]*[+*][^)]*\)[+*{]').hasMatch(pattern)) {
+      throw ArgumentError(
+        'Regex pattern may be vulnerable to ReDoS: contains nested quantifiers. '
+        'Pattern: $pattern',
+      );
+    }
+
+    // 2. Alternation with overlapping prefixes: (a|a)+, (ab|ac)+
+    // Fixed: Use single backslash in raw string for proper backreference
+    if (RegExp(r'\(([^|]+)\|\1[^)]*\)[+*]').hasMatch(pattern)) {
+      throw ArgumentError(
+        'Regex pattern may be vulnerable to ReDoS: contains overlapping alternation. '
+        'Pattern: $pattern',
+      );
+    }
+
+    // 3. Test the pattern with multiple test strings to catch various ReDoS patterns
+    try {
+      final regex = RegExp(pattern);
+      // Test with multiple strings that could trigger backtracking in different pattern types
+      const testStrings = [
+        'aaaaaaaaaaaaaaaaaaaa!', // Alphabetic repetition + termination
+        '00000000000000000000x', // Numeric repetition
+        'a,a,a,a,a,a,a,a,a,a,a,a,a,a,', // Comma-separated repetition
+        'aaaaaaaaaaaaaaaaaaaa', // Pure repetition (no terminator)
+      ];
+
+      for (final testString in testStrings) {
+        final stopwatch = Stopwatch()..start();
+        regex.hasMatch(testString);
+        stopwatch.stop();
+
+        if (stopwatch.elapsedMilliseconds > 100) {
+          throw ArgumentError(
+            'Regex pattern may be vulnerable to ReDoS: matching took ${stopwatch.elapsedMilliseconds}ms on test input. '
+            'Pattern: $pattern',
+          );
+        }
+      }
+    } on ArgumentError {
+      rethrow;
+    } catch (e) {
+      throw ArgumentError('Invalid regex pattern: $pattern. Error: $e');
+    }
+  }
+
   /// Escapes special characters in a string for use in generated Dart code.
-  /// Handles backslashes, single quotes, newlines, and dollar signs (for string interpolation).
+  /// Handles backslashes, single quotes, newlines, carriage returns, tabs, and dollar signs.
   static String _escapeString(String input) {
     return input
         .replaceAll('\\', '\\\\')
         .replaceAll("'", "\\'")
         .replaceAll('\n', '\\n')
         .replaceAll('\r', '\\r')
+        .replaceAll('\t', '\\t')
         .replaceAll('\$', '\\\$');
   }
 }

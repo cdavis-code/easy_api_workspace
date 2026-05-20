@@ -56,6 +56,9 @@ class McpBuilder extends Builder {
 
     if (tools.isEmpty) return; // No tools found anywhere
 
+    // Aggregate prompts from this library AND all its package-local imports
+    final prompts = await _extractAllPrompts(library);
+
     // Conditionally generate MCP server code (gated by generateMcp flag)
     if (config.generateMcp) {
       // Generate the appropriate server code based on transport type
@@ -67,12 +70,15 @@ class McpBuilder extends Builder {
               codeMode: config.codeMode,
               codeModeTimeout: config.codeModeTimeout,
               logErrors: config.logErrors,
+              prompts: prompts,
+              corsOrigins: config.corsOrigins,
             )
           : StdioTemplate.generate(
               tools,
               codeMode: config.codeMode,
               codeModeTimeout: config.codeModeTimeout,
               logErrors: config.logErrors,
+              prompts: prompts,
             );
 
       // Write the generated server code
@@ -83,7 +89,7 @@ class McpBuilder extends Builder {
 
       // Optionally generate JSON metadata file
       if (config.generateJson) {
-        final jsonMetadata = _generateJsonMetadata(tools);
+        final jsonMetadata = _generateJsonMetadata(tools, prompts: prompts);
         await buildStep.writeAsString(
           inputId.changeExtension('.mcp.json'),
           jsonEncode(jsonMetadata),
@@ -545,6 +551,12 @@ class McpBuilder extends Builder {
       metadata['pattern'] = pattern.stringValue;
     }
 
+    // Extract maxLength
+    final maxLength = reader.peek('maxLength');
+    if (maxLength != null && !maxLength.isNull && maxLength.isInt) {
+      metadata['maxLength'] = maxLength.intValue;
+    }
+
     // Extract sensitive
     final sensitive = reader.peek('sensitive');
     if (sensitive != null && !sensitive.isNull && sensitive.isBool) {
@@ -588,6 +600,245 @@ class McpBuilder extends Builder {
       }
     }
     return null;
+  }
+
+  /// Extracts prompts from a library (top-level functions and class methods).
+  Future<List<Map<String, dynamic>>> _extractPromptsFromLibrary(
+    LibraryElement library,
+  ) async {
+    final prompts = <Map<String, dynamic>>[];
+    const promptChecker = TypeChecker.fromUrl(
+      'package:easy_api_annotations/mcp_annotations.dart#Prompt',
+    );
+    const promptArgumentChecker = TypeChecker.fromUrl(
+      'package:easy_api_annotations/mcp_annotations.dart#PromptArgument',
+    );
+
+    // Top-level functions
+    for (final element in library.topLevelFunctions) {
+      final promptAnnotation = promptChecker.firstAnnotationOf(element);
+      if (promptAnnotation == null) continue;
+
+      final promptData = _extractPromptData(
+        promptAnnotation,
+        element,
+        promptArgumentChecker,
+      );
+      if (promptData != null) {
+        prompts.add(promptData);
+      }
+    }
+
+    // Class methods
+    for (final element in library.classes) {
+      for (final method in element.methods) {
+        final promptAnnotation = promptChecker.firstAnnotationOf(method);
+        if (promptAnnotation == null) continue;
+
+        final promptData = _extractPromptData(
+          promptAnnotation,
+          method,
+          promptArgumentChecker,
+          className: element.name,
+          isStatic: method.isStatic,
+        );
+        if (promptData != null) {
+          prompts.add(promptData);
+        }
+      }
+    }
+
+    return prompts;
+  }
+
+  /// Extracts prompt metadata from a single annotated method.
+  Map<String, dynamic>? _extractPromptData(
+    DartObject? promptAnnotation,
+    ExecutableElement element,
+    TypeChecker promptArgumentChecker, {
+    String? className,
+    bool isStatic = false,
+  }) {
+    final reader = ConstantReader(promptAnnotation);
+
+    // Extract name
+    String promptName;
+    final nameField = reader.peek('name');
+    if (nameField != null && nameField.isString) {
+      final customName = nameField.stringValue;
+      if (customName.isNotEmpty) {
+        _validateIdentifier(customName, '@Prompt(name:)');
+        promptName = customName;
+      } else {
+        promptName = element.name ?? 'unnamed';
+      }
+    } else {
+      promptName = element.name ?? 'unnamed';
+    }
+
+    // Extract title
+    String? title;
+    final titleField = reader.peek('title');
+    if (titleField != null && titleField.isString) {
+      title = titleField.stringValue;
+    }
+
+    // Extract description
+    String description;
+    final descField = reader.peek('description');
+    if (descField != null && descField.isString) {
+      description = descField.stringValue;
+    } else if (element.documentationComment != null &&
+        element.documentationComment!.isNotEmpty) {
+      description = _stripDocComment(element.documentationComment!);
+    } else {
+      description = 'Prompt $promptName';
+    }
+
+    // Extract arguments from parameters
+    final arguments = <Map<String, dynamic>>[];
+    for (final param in element.formalParameters) {
+      final typeString = _getTypeString(param.type);
+      final isOptional = !param.isRequired;
+      final isNamedParam = param.isNamed;
+      final isNullable = typeString.endsWith('?');
+
+      // Extract @PromptArgument annotation if present
+      final argumentMetadata = _extractPromptArgumentMetadata(
+        param,
+        promptArgumentChecker,
+      );
+
+      // Determine if required (from annotation or inferred from nullability)
+      final required =
+          argumentMetadata != null && argumentMetadata.containsKey('required')
+          ? argumentMetadata['required'] as bool
+          : !isNullable;
+
+      final argName =
+          argumentMetadata != null && argumentMetadata.containsKey('alias')
+          ? argumentMetadata['alias'] as String
+          : param.name;
+
+      arguments.add(<String, dynamic>{
+        'name': argName,
+        'dartName': param.name,
+        'type': typeString,
+        'isNullable': isNullable,
+        'isOptional': isOptional,
+        'isNamed': isNamedParam,
+        'required': required,
+        'title': argumentMetadata?['title'],
+        'description': argumentMetadata?['description'],
+      });
+    }
+
+    final isAsync = element.returnType.isDartAsyncFuture;
+
+    return <String, dynamic>{
+      'name': promptName,
+      'methodName': element.name ?? 'unnamed',
+      'title': title,
+      'description': description,
+      'arguments': arguments,
+      'isAsync': isAsync,
+      'className': className,
+      'isStatic': isStatic,
+    };
+  }
+
+  /// Extracts metadata from a @PromptArgument annotation on a parameter.
+  Map<String, dynamic>? _extractPromptArgumentMetadata(
+    FormalParameterElement param,
+    TypeChecker promptArgumentChecker,
+  ) {
+    final annotation = promptArgumentChecker.firstAnnotationOf(param);
+    if (annotation == null) return null;
+
+    final reader = ConstantReader(annotation);
+    final metadata = <String, dynamic>{};
+
+    // Extract alias
+    final alias = reader.peek('alias');
+    if (alias != null && !alias.isNull && alias.isString) {
+      final aliasValue = alias.stringValue;
+      _validateIdentifier(aliasValue, '@PromptArgument(alias:)');
+      metadata['alias'] = aliasValue;
+    }
+
+    // Extract title
+    final title = reader.peek('title');
+    if (title != null && !title.isNull && title.isString) {
+      metadata['title'] = title.stringValue;
+    }
+
+    // Extract description
+    final description = reader.peek('description');
+    if (description != null && !description.isNull && description.isString) {
+      metadata['description'] = description.stringValue;
+    }
+
+    // Extract required
+    final required = reader.peek('required');
+    if (required != null && !required.isNull && required.isBool) {
+      metadata['required'] = required.boolValue;
+    }
+
+    return metadata.isEmpty ? null : metadata;
+  }
+
+  /// Extracts prompts from the current library and all package-local imports.
+  Future<List<Map<String, dynamic>>> _extractAllPrompts(
+    LibraryElement library,
+  ) async {
+    final allPrompts = <Map<String, dynamic>>[];
+    final aliasCounts = <String, int>{};
+
+    // Get the current library's package name
+    final currentPackageUri = library.uri.toString();
+    final packageName = _extractPackageName(currentPackageUri);
+
+    // Extract prompts from the current library
+    final currentLibPrompts = await _extractPromptsFromLibrary(library);
+    final currentAlias = _deriveAlias(currentPackageUri);
+    for (final prompt in currentLibPrompts) {
+      prompt['sourceImport'] = currentPackageUri;
+      prompt['sourceAlias'] = currentAlias;
+      allPrompts.add(prompt);
+    }
+
+    // Scan imported libraries for prompts
+    final importedLibraries = library.firstFragment.importedLibraries;
+    for (final importedLib in importedLibraries) {
+      final importedUri = importedLib.uri.toString();
+
+      // Skip non-package URIs
+      if (!importedUri.startsWith('package:')) continue;
+
+      // Skip libraries from other packages
+      final importedPackageName = _extractPackageName(importedUri);
+      if (importedPackageName != packageName) continue;
+
+      // Extract prompts from this imported library
+      final importedPrompts = await _extractPromptsFromLibrary(importedLib);
+      if (importedPrompts.isEmpty) continue;
+
+      // Derive alias and ensure uniqueness
+      var alias = _deriveAlias(importedUri);
+      final count = aliasCounts[alias] ?? 0;
+      if (count > 0) {
+        alias = '${alias}_$count';
+      }
+      aliasCounts[alias] = count + 1;
+
+      for (final prompt in importedPrompts) {
+        prompt['sourceImport'] = importedUri;
+        prompt['sourceAlias'] = alias;
+        allPrompts.add(prompt);
+      }
+    }
+
+    return allPrompts;
   }
 
   String _getTypeString(DartType type) {
@@ -720,7 +971,10 @@ class McpBuilder extends Builder {
     return <String, dynamic>{'type': 'object'};
   }
 
-  Map<String, dynamic> _generateJsonMetadata(List<Map<String, dynamic>> tools) {
+  Map<String, dynamic> _generateJsonMetadata(
+    List<Map<String, dynamic>> tools, {
+    List<Map<String, dynamic>> prompts = const [],
+  }) {
     final toolList = <Map<String, dynamic>>[];
 
     for (final t in tools) {
@@ -764,7 +1018,34 @@ class McpBuilder extends Builder {
       });
     }
 
-    return <String, dynamic>{'schemaVersion': '1.0', 'tools': toolList};
+    // Generate prompt metadata
+    final promptList = <Map<String, dynamic>>[];
+    for (final p in prompts) {
+      final name = p['name'] as String;
+      final arguments = <Map<String, dynamic>>[];
+
+      for (final arg in p['arguments'] as List<Map<String, dynamic>>) {
+        arguments.add(<String, dynamic>{
+          'name': arg['name'],
+          if (arg['title'] != null) 'title': arg['title'],
+          if (arg['description'] != null) 'description': arg['description'],
+          'required': arg['required'],
+        });
+      }
+
+      promptList.add(<String, dynamic>{
+        'name': name,
+        if (p['title'] != null) 'title': p['title'],
+        'description': p['description'],
+        if (arguments.isNotEmpty) 'arguments': arguments,
+      });
+    }
+
+    return <String, dynamic>{
+      'schemaVersion': '1.0',
+      'tools': toolList,
+      if (promptList.isNotEmpty) 'prompts': promptList,
+    };
   }
 
   /// Walks the library's top-level functions, classes, and class methods
@@ -821,6 +1102,7 @@ class McpBuilder extends Builder {
       codeModeTimeout: _peekInt(reader, 'codeModeTimeout') ?? 30,
       logErrors: _peekBool(reader, 'logErrors') ?? false,
       annotationsDefault: _extractAnnotationsDefault(reader),
+      corsOrigins: _extractCorsOrigins(reader),
     );
   }
 
@@ -994,6 +1276,57 @@ class McpBuilder extends Builder {
     }
     return merged;
   }
+
+  /// Extracts CORS origins from @Server annotation.
+  /// Returns ['*'] by default for backward compatibility.
+  /// Validates that origins are well-formed URLs or the wildcard '*'.
+  List<String> _extractCorsOrigins(ConstantReader reader) {
+    final corsField = reader.peek('corsOrigins');
+    if (corsField == null || corsField.isNull || !corsField.isList) {
+      return ['*']; // Default for backward compatibility
+    }
+
+    final origins = corsField.listValue;
+    if (origins.isEmpty) {
+      return ['*'];
+    }
+
+    final validatedOrigins = origins
+        .map((e) {
+          final val = ConstantReader(e);
+          if (!val.isString) return null;
+          final origin = val.stringValue;
+
+          // Validate origin format
+          if (origin == '*') return origin; // Wildcard is valid
+
+          // Must be a valid URL with http or https scheme
+          final urlPattern = RegExp(
+            r'^https?://[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*(:[0-9]+)?$',
+          );
+          if (!urlPattern.hasMatch(origin)) {
+            throw ArgumentError(
+              'Invalid CORS origin: "$origin". '
+              'Origins must be valid URLs with http/https scheme (e.g., "https://example.com") '
+              'or the wildcard "*".',
+            );
+          }
+
+          return origin;
+        })
+        .whereType<String>()
+        .toList();
+
+    // Validate that '*' is not mixed with specific origins
+    if (validatedOrigins.contains('*') && validatedOrigins.length > 1) {
+      throw ArgumentError(
+        'CORS origins cannot mix wildcard "*" with specific origins. '
+        'Use either ["*"] for all origins or a list of specific origins.',
+      );
+    }
+
+    return validatedOrigins.isEmpty ? ['*'] : validatedOrigins;
+  }
 }
 
 /// Immutable view of the fields on a `@Server` annotation, resolved with
@@ -1013,6 +1346,7 @@ class _ServerConfig {
     required this.codeModeTimeout,
     required this.logErrors,
     required this.annotationsDefault,
+    required this.corsOrigins,
   });
 
   final String transport;
@@ -1027,6 +1361,7 @@ class _ServerConfig {
   final int codeModeTimeout;
   final bool logErrors;
   final Map<String, dynamic>? annotationsDefault;
+  final List<String> corsOrigins;
 }
 
 Builder mcpBuilder(BuilderOptions options) => McpBuilder();
