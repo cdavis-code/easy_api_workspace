@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-05-20
+
+### Fixed
+- Generated MCP tool handlers now properly serialize `Map<String, dynamic>` return types using `jsonEncode()` instead of `.toString()`. Previously, tools returning maps (e.g., from `response.toJson()`) produced invalid JSON output like `{key: value}` instead of `{"key": "value"}`. The `_serializeResult` function in both stdio and HTTP templates now includes a `Map` type check that mirrors the OpenAPI builder's behavior.
+
 ## [1.0.1] - 2026-05-19
 
 ### Security
