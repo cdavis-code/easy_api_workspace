@@ -96,6 +96,7 @@ example/
   - [`@Server`](#server)
   - [`@Tool`](#tool)
   - [`@Parameter` (Optional)](#parameter-optional)
+  - [`@Prompt` (MCP Prompts)](#prompt-mcp-prompts)
   - [Code Mode](#code-mode)
   - [REST API Specification Generation](#rest-api-specification-generation)
 - [Features](#features)
@@ -304,6 +305,99 @@ Future<User> createUser({
 
 **Note:** `@Parameter` is optional. By default, the generator extracts parameter information from Dart types and method signatures.
 
+### @Prompt (MCP Prompts)
+
+Prompts are user-invoked templates that generate structured messages for interacting with language models. Unlike tools (which are model-called), prompts are explicitly selected by users, typically as slash commands in MCP clients like Claude Desktop.
+
+```dart
+import 'package:easy_api_annotations/easy_api_annotations.dart';
+
+class CodeReviewPrompts {
+  @Prompt(
+    title: 'Code Review',
+    description: 'Asks the LLM to analyze code quality and suggest improvements',
+  )
+  PromptResult codeReview({
+    @PromptArgument(
+      title: 'Source Code',
+      description: 'The code to review for quality and issues',
+    )
+    required String code,
+  }) {
+    return PromptResult(
+      description: 'Code review prompt for the provided source code',
+      messages: [
+        PromptMessage(
+          role: PromptRole.user,
+          content: TextPromptContent(
+            'Please review this code and suggest improvements:\n\n```\n$code\n```',
+          ),
+        ),
+      ],
+    );
+  }
+}
+```
+
+**Key Concepts:**
+
+- **User-Controlled**: Prompts are explicitly invoked by users (e.g., `/code_review`), not auto-called by the model
+- **Structured Messages**: Return a `PromptResult` containing a list of `PromptMessage` objects with roles (`user` or `assistant`)
+- **Rich Content**: Support text, images, audio, and embedded resources via the `PromptContent` hierarchy
+- **Typed Arguments**: Method parameters become prompt arguments, with optional `@PromptArgument` metadata
+
+**`@Prompt` Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `String?` | Custom prompt name (defaults to method name) |
+| `title` | `String?` | Human-readable title shown in MCP clients |
+| `description` | `String?` | Description of what the prompt does |
+
+**`@PromptArgument` Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `alias` | `String?` | Custom external name for the argument |
+| `title` | `String?` | Human-readable label displayed in clients |
+| `description` | `String?` | Detailed description of the argument |
+| `required` | `bool?` | Whether the argument is required (default: inferred from nullability) |
+
+**Content Types:**
+
+- `TextPromptContent` - Plain text messages
+- `ImagePromptContent` - Base64-encoded images with MIME type
+- `AudioPromptContent` - Base64-encoded audio with MIME type
+- `ResourcePromptContent` - Embedded server-side resources with URI and MIME type
+
+**Generated Output:**
+
+When prompts are defined, the generator:
+- Adds `PromptsSupport` mixin to the server class
+- Registers prompts using `addPrompt()` in the constructor
+- Generates `prompts/list` and `prompts/get` JSON-RPC handlers
+- Includes prompt metadata in `.mcp.json` (when `generateJson: true`)
+
+**Important Limitation:**
+
+Libraries containing **only prompts** (no `@Tool` methods) must be explicitly imported in the file with the `@Server` annotation. The generator extracts prompts from imported libraries, but only if those libraries are already imported for other reasons (e.g., they contain tools or are imported by your main file).
+
+**Example:**
+
+```dart
+// bin/example.dart
+import 'package:easy_api_annotations/mcp_annotations.dart';
+import 'package:my_app/src/user_store.dart';  // Contains @Tool methods
+import 'package:my_app/src/example_prompts.dart';  // Contains ONLY @Prompt methods
+
+@Server(transport: McpTransport.stdio)
+void main() {
+  // The generator will extract prompts from both imported libraries
+}
+```
+
+If `example_prompts.dart` is not imported, its prompts will not be included in the generated server.
+
 ### Code Mode
 
 Enable batch tool orchestration via sandboxed JavaScript execution. Reduces latency by replacing N sequential round-trips with a single call.
@@ -367,6 +461,7 @@ A companion `.openapi.dart` file is also generated, providing a complete REST AP
 - **Two transport modes** - stdio (JSON-RPC) and HTTP (Shelf-based)
 - **Configurable HTTP server** - Customize port and bind address
 - **Rich parameter metadata** - Optional `@Parameter` annotation for titles, descriptions, validation, sensitive flags, and enum values
+- **MCP Prompts** - User-invoked prompt templates with `@Prompt` and `@PromptArgument` annotations for slash commands
 - **Custom tool names** - Use `name` parameter on `@Tool`, `toolPrefix` or `autoClassPrefix` on `@Server` to avoid collisions
 - **Automatic schema generation** - Dart types mapped to JSON Schema
 - **Optional parameter support** - Named and optional positional parameters

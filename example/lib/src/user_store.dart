@@ -66,6 +66,7 @@ class UserStore {
       title: 'Full Name',
       description: 'The user\'s full name (1-100 characters)',
       example: 'John Doe',
+      maxLength: 100,
     )
     required String name,
     @Parameter(
@@ -73,6 +74,7 @@ class UserStore {
       description: 'A valid email address for the user',
       example: 'john.doe@example.com',
       pattern: r'^[\w\.-]+@[\w\.-]+\.\w+$',
+      maxLength: 254,
     )
     required String email,
   }) async {
@@ -162,8 +164,10 @@ class UserStore {
     @Parameter(
       alias: 'q',
       title: 'Search Query',
-      description: 'Text to search for in user names and emails',
+      description:
+          'Text to search for in user names and emails (max 1000 characters)',
       example: 'john',
+      maxLength: 1000,
     )
     String query,
   ) async {
