@@ -28,7 +28,7 @@ dependencies:
 
 dev_dependencies:
   build_runner: ^2.4.0
-  easy_api_generator: ^1.1.0
+  easy_api_generator: ^1.1.1
 ```
 
 ## Usage
@@ -373,7 +373,7 @@ class MyServer { ... }
 - **Optional parameter support** - Handles named and optional positional parameters with default values
 - **Doc comment extraction** - Uses function doc comments when `@Tool.description` not provided
 - **Dynamic method dispatch** - Generated `_dispatch` function routes to actual tool methods
-- **Security features** - Identifier validation, ReDoS prevention, graceful process shutdown, secure temp file permissions
+- **Security features** - Identifier validation, ReDoS prevention, graceful process shutdown, secure temp file permissions, unpredictable temp directory naming
 
 ## Example
 

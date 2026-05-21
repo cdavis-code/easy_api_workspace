@@ -287,7 +287,12 @@ String _generateRunCodeSandbox() {
     io.Directory? tempDir;
     try {
       final wrapper = _buildJsWrapper(userCode);
-      tempDir = await io.Directory.systemTemp.createTemp('mcp_code_mode_');
+      
+      // Security: Use unpredictable directory name with timestamp + random suffix
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final random = math.Random.secure();
+      final suffix = List.generate(8, (_) => random.nextInt(16).toRadixString(16)).join();
+      tempDir = await io.Directory.systemTemp.createTemp('mcp_sandbox_\${timestamp}_\${suffix}_');
       final scriptFile = io.File('\${tempDir.path}/sandbox.js');
             
       // Set restrictive permissions (owner read/write only)
@@ -1033,6 +1038,7 @@ $paramConversions
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
+import 'dart:math' as math;
 
 import 'package:dart_mcp/server.dart';
 import 'package:dart_mcp/stdio.dart';
@@ -1442,6 +1448,7 @@ $paramConversions
 import 'dart:async';
 import 'dart:convert';
 $ioImport
+import 'dart:math' as math;
 
 import 'package:dart_mcp/server.dart';
 import 'package:shelf/shelf.dart' as shelf;

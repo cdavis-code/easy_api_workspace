@@ -938,7 +938,7 @@ void main() {
       test('generates default CORS origins as wildcard', () {
         final result = HttpTemplate.generate([], 3000, '127.0.0.1');
 
-        expect(result, contains("const _corsOrigins = <'*'>;"));
+        expect(result, contains("const _corsOrigins = <String>['*'];"));
         expect(result, contains('Access-Control-Allow-Origin'));
       });
 
@@ -956,7 +956,7 @@ void main() {
         expect(
           result,
           contains(
-            "const _corsOrigins = <'https://myapp.example.com', 'https://admin.example.com'>;",
+            "const _corsOrigins = <String>['https://myapp.example.com', 'https://admin.example.com'];",
           ),
         );
       });

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-05-21
+
+### Security
+
+#### Critical
+- **Temporary Directory Hardening**: Enhanced code mode sandbox temporary directory creation with unpredictable naming using timestamp + cryptographically secure random suffix (`mcp_sandbox_{timestamp}_{random}_`). Prevents symlink attacks by making directory names unpredictable. Added `dart:math` import for `Random.secure()` in both stdio and HTTP templates.
+
 ## [1.1.0] - 2026-05-20
 
 ### Added
@@ -30,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Critical
 - **Node.js Sandbox Hardening**: Added `--no-addons` and `--frozen-intrinsics` flags to code mode sandbox execution. Prevents native module loading and prototype pollution attacks in the JavaScript sandbox environment.
 - **Prompt Argument Validation**: Added 10,000 character length limit on prompt argument values with proper error handling. Prevents potential denial-of-service through excessively long inputs. All prompt handlers now include try-catch blocks with generic error messages.
+- **Temporary Directory Security**: Enhanced temporary directory creation with unpredictable naming (timestamp + cryptographically secure random suffix) to prevent symlink attacks. Directory names now follow pattern `mcp_sandbox_{timestamp}_{random}_` instead of predictable `mcp_code_mode_` prefix.
 - **Temporary File Security**: Set restrictive file permissions (700 for directories, 600 for files) on Linux/macOS systems. Prevents other users from reading sandbox code and tool information from temporary files.
 
 #### High  
