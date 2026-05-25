@@ -387,41 +387,34 @@ String _generateRunCodeSandbox() {
 
       return result;
     } finally {
-      // Graceful shutdown: check if process already exited, then SIGTERM → SIGKILL
-      if (process != null) {
+      // Graceful shutdown: process is guaranteed to be non-null here
+      // (otherwise process.stdout would have thrown earlier)
+      final proc = process;
+      final dir = tempDir;
+      try {
+        // First, check if process already exited naturally
+        await proc.exitCode.timeout(
+          const Duration(milliseconds: 100),
+        );
+      } catch (_) {
+        // Process still running, begin graceful shutdown
+        proc.kill(io.ProcessSignal.sigterm);
         try {
-          // First, check if process already exited naturally
-          await process.exitCode.timeout(
-            const Duration(milliseconds: 100),
+          // Wait up to 2 seconds for graceful shutdown
+          await proc.exitCode.timeout(
+            const Duration(seconds: 2),
+            onTimeout: () {
+              // Process didn't exit, force kill
+              proc.kill(io.ProcessSignal.sigkill);
+              return -1;
+            },
           );
         } catch (_) {
-          // Process still running, begin graceful shutdown
-          process.kill(io.ProcessSignal.sigterm);
-          try {
-            // Wait up to 2 seconds for graceful shutdown
-            await process.exitCode.timeout(
-              const Duration(seconds: 2),
-              onTimeout: () {
-                // Process didn't exit, force kill
-                try {
-                  process?.kill(io.ProcessSignal.sigkill);
-                } catch (_) {
-                  // Process may have just exited - ignore
-                }
-                return -1;
-              },
-            );
-          } catch (_) {
-            // Error during exit code wait - attempt force kill as fallback
-            try {
-              process?.kill(io.ProcessSignal.sigkill);
-            } catch (_) {
-              // Process already dead - ignore
-            }
-          }
+          // Error during exit code wait - attempt force kill as fallback
+          proc.kill(io.ProcessSignal.sigkill);
         }
       }
-      await tempDir?.delete(recursive: true);
+      await dir.delete(recursive: true);
     }
   }''';
 }
@@ -1038,11 +1031,11 @@ $paramConversions
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
-import 'dart:math' as math;
+${codeMode ? "import 'dart:math' as math;" : ''}
 
 import 'package:dart_mcp/server.dart';
 import 'package:dart_mcp/stdio.dart';
-import 'package:easy_api_annotations/easy_api_annotations.dart' as easy_api;
+${hasPrompts ? "import 'package:easy_api_annotations/easy_api_annotations.dart' as easy_api;" : ''}
 
 $listInnerImportStatements
 $sourceImportStatements
@@ -1409,10 +1402,10 @@ $paramConversions
         })
         .join('\n');
 
-    // dart:io is needed for default address (InternetAddress) or code mode
-    final ioImport = (address == '127.0.0.1' || codeMode)
-        ? "import 'dart:io' as io;"
-        : '';
+    // dart:io is always needed for HTTP transport:
+    // - io.Platform.environment['PORT'] for PORT env var support
+    // - io.stderr for error logging when logErrors is true
+    const ioImport = "import 'dart:io' as io;";
 
     final codeModeSpecRegistry = codeMode
         ? _generateToolSpecRegistry(codeModeTools)
@@ -1448,13 +1441,13 @@ $paramConversions
 import 'dart:async';
 import 'dart:convert';
 $ioImport
-import 'dart:math' as math;
+${codeMode ? "import 'dart:math' as math;" : ''}
 
 import 'package:dart_mcp/server.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:stream_channel/stream_channel.dart';
-import 'package:easy_api_annotations/easy_api_annotations.dart' as easy_api;
+${hasPrompts ? "import 'package:easy_api_annotations/easy_api_annotations.dart' as easy_api;" : ''}
 
 $listInnerImportStatements
 $sourceImportStatements
