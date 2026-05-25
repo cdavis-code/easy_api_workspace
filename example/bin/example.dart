@@ -10,6 +10,7 @@ import 'package:mcp_example/src/todo_store.dart';
   generateJson: true,
   generateMcp: true,
   generateRest: true,
+  generateCli: true,
   codeMode: true,
   logErrors: true,
   annotationsDefault: ToolAnnotations(openWorldHint: false),

@@ -5,8 +5,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 
+
 import 'package:dart_mcp/server.dart';
 import 'package:dart_mcp/stdio.dart';
+
+
 
 import 'package:mcp_example/src/user_store.dart' as user_store;
 import 'package:mcp_example/src/todo_store.dart' as todo_store;
@@ -23,7 +26,10 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
 
   MCPServerWithTools(super.channel)
     : super.fromStreamChannel(
-        implementation: Implementation(name: 'mcp-server', version: '1.0.0'),
+        implementation: Implementation(
+          name: 'mcp-server',
+          version: '1.0.0',
+        ),
         instructions: 'Auto-generated MCP server',
       ) {
     registerTool(
@@ -31,25 +37,20 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'createUser',
         description: 'Create a new user',
         inputSchema: Schema.object(
-          properties: {
-            'name': Schema.string(
-              title: 'Full Name',
-              description: 'The user\'s full name (1-100 characters)',
-            ),
-            'email': Schema.string(
-              title: 'Email Address',
-              description: 'A valid email address for the user',
-              pattern: '^[\\w\\.-]+@[\\w\\.-]+\\.\\w+\$',
-            ),
-          },
-          required: ['name', 'email'],
-        ),
-        annotations: ToolAnnotations(
-          readOnlyHint: false,
-          destructiveHint: false,
-          idempotentHint: false,
-          openWorldHint: false,
-        ),
+    properties: {
+      'name': Schema.string(
+      title: 'Full Name',
+      description: 'The user\'s full name (1-100 characters)'
+    ),
+      'email': Schema.string(
+      title: 'Email Address',
+      description: 'A valid email address for the user',
+      pattern: '^[\\w\\.-]+@[\\w\\.-]+\\.\\w+\$'
+    ),
+    },
+    required: ['name', 'email'],
+  ),
+        annotations: ToolAnnotations(readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false),
       ),
       _createUser,
     );
@@ -58,9 +59,11 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'getUserTodos',
         description: 'Get all todos assigned to a user',
         inputSchema: Schema.object(
-          properties: {'userId': Schema.int()},
-          required: ['userId'],
-        ),
+    properties: {
+      'userId': Schema.int(),
+    },
+    required: ['userId'],
+  ),
         annotations: ToolAnnotations(readOnlyHint: true, openWorldHint: false),
       ),
       _getUserTodos,
@@ -70,9 +73,11 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'getUser',
         description: 'Get user by ID',
         inputSchema: Schema.object(
-          properties: {'id': Schema.int()},
-          required: ['id'],
-        ),
+    properties: {
+      'id': Schema.int(),
+    },
+    required: ['id'],
+  ),
         annotations: ToolAnnotations(readOnlyHint: true, openWorldHint: false),
       ),
       _getUser,
@@ -91,15 +96,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'deleteUser',
         description: 'Delete a user',
         inputSchema: Schema.object(
-          properties: {'id': Schema.int()},
-          required: ['id'],
-        ),
-        annotations: ToolAnnotations(
-          readOnlyHint: false,
-          destructiveHint: true,
-          idempotentHint: true,
-          openWorldHint: false,
-        ),
+    properties: {
+      'id': Schema.int(),
+    },
+    required: ['id'],
+  ),
+        annotations: ToolAnnotations(readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false),
       ),
       _deleteUser,
     );
@@ -108,15 +110,14 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'searchUsers',
         description: 'Search users by query',
         inputSchema: Schema.object(
-          properties: {
-            'q': Schema.string(
-              title: 'Search Query',
-              description:
-                  'Text to search for in user names and emails (max 1000 characters)',
-            ),
-          },
-          required: ['q'],
-        ),
+    properties: {
+      'q': Schema.string(
+      title: 'Search Query',
+      description: 'Text to search for in user names and emails (max 1000 characters)'
+    ),
+    },
+    required: ['q'],
+  ),
         annotations: ToolAnnotations(readOnlyHint: true, openWorldHint: false),
       ),
       _searchUsers,
@@ -126,14 +127,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'createTodo',
         description: 'Create a new todo',
         inputSchema: Schema.object(
-          properties: {'title': Schema.string()},
-          required: ['title'],
-        ),
-        annotations: ToolAnnotations(
-          readOnlyHint: false,
-          destructiveHint: false,
-          openWorldHint: false,
-        ),
+    properties: {
+      'title': Schema.string(),
+    },
+    required: ['title'],
+  ),
+        annotations: ToolAnnotations(readOnlyHint: false, destructiveHint: false, openWorldHint: false),
       ),
       _createTodo,
     );
@@ -142,9 +141,11 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'getTodo',
         description: 'Get todo by ID',
         inputSchema: Schema.object(
-          properties: {'id': Schema.int()},
-          required: ['id'],
-        ),
+    properties: {
+      'id': Schema.int(),
+    },
+    required: ['id'],
+  ),
         annotations: ToolAnnotations(readOnlyHint: true, openWorldHint: false),
       ),
       _getTodo,
@@ -163,14 +164,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'deleteTodo',
         description: 'Delete a todo',
         inputSchema: Schema.object(
-          properties: {'id': Schema.int()},
-          required: ['id'],
-        ),
-        annotations: ToolAnnotations(
-          readOnlyHint: false,
-          idempotentHint: true,
-          openWorldHint: false,
-        ),
+    properties: {
+      'id': Schema.int(),
+    },
+    required: ['id'],
+  ),
+        annotations: ToolAnnotations(readOnlyHint: false, idempotentHint: true, openWorldHint: false),
       ),
       _deleteTodo,
     );
@@ -179,14 +178,12 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'completeTodo',
         description: 'Mark a todo as completed',
         inputSchema: Schema.object(
-          properties: {'id': Schema.int()},
-          required: ['id'],
-        ),
-        annotations: ToolAnnotations(
-          readOnlyHint: false,
-          idempotentHint: true,
-          openWorldHint: false,
-        ),
+    properties: {
+      'id': Schema.int(),
+    },
+    required: ['id'],
+  ),
+        annotations: ToolAnnotations(readOnlyHint: false, idempotentHint: true, openWorldHint: false),
       ),
       _completeTodo,
     );
@@ -195,14 +192,13 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'assignTodoToUser',
         description: 'Assign a todo to a user',
         inputSchema: Schema.object(
-          properties: {'todoId': Schema.int(), 'userId': Schema.int()},
-          required: ['todoId', 'userId'],
-        ),
-        annotations: ToolAnnotations(
-          readOnlyHint: false,
-          idempotentHint: true,
-          openWorldHint: false,
-        ),
+    properties: {
+      'todoId': Schema.int(),
+      'userId': Schema.int(),
+    },
+    required: ['todoId', 'userId'],
+  ),
+        annotations: ToolAnnotations(readOnlyHint: false, idempotentHint: true, openWorldHint: false),
       ),
       _assignTodoToUser,
     );
@@ -211,14 +207,13 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'removeTodoFromUser',
         description: 'Remove a user from a todo',
         inputSchema: Schema.object(
-          properties: {'todoId': Schema.int(), 'userId': Schema.int()},
-          required: ['todoId', 'userId'],
-        ),
-        annotations: ToolAnnotations(
-          readOnlyHint: false,
-          idempotentHint: true,
-          openWorldHint: false,
-        ),
+    properties: {
+      'todoId': Schema.int(),
+      'userId': Schema.int(),
+    },
+    required: ['todoId', 'userId'],
+  ),
+        annotations: ToolAnnotations(readOnlyHint: false, idempotentHint: true, openWorldHint: false),
       ),
       _removeTodoFromUser,
     );
@@ -227,9 +222,11 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         name: 'getTodosForUser',
         description: 'Get all todos assigned to a user',
         inputSchema: Schema.object(
-          properties: {'userId': Schema.int()},
-          required: ['userId'],
-        ),
+    properties: {
+      'userId': Schema.int(),
+    },
+    required: ['userId'],
+  ),
         annotations: ToolAnnotations(readOnlyHint: true, openWorldHint: false),
       ),
       _getTodosForUser,
@@ -252,43 +249,28 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
 
   FutureOr<CallToolResult> _createUser(CallToolRequest request) async {
     try {
-      final name = request.arguments!['name'] as String;
-      final email = request.arguments!['email'] as String;
-      if (name.length > 100) {
-        return CallToolResult(
-          content: [
-            TextContent(
-              text: 'Parameter name exceeds maximum length of 100 characters.',
-            ),
-          ],
-          isError: true,
-        );
-      }
-      if (email.length > 254) {
-        return CallToolResult(
-          content: [
-            TextContent(
-              text: 'Parameter email exceeds maximum length of 254 characters.',
-            ),
-          ],
-          isError: true,
-        );
-      }
-      if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(email)) {
-        return CallToolResult(
-          content: [
-            TextContent(
-              text: 'Parameter email does not match required pattern.',
-            ),
-          ],
-          isError: true,
-        );
-      }
-
-      final result = await user_store.UserStore.createUser(
-        name: name,
-        email: email,
+    final name = request.arguments!['name'] as String;
+    final email = request.arguments!['email'] as String;
+    if (name.length > 100) {
+      return CallToolResult(
+        content: [TextContent(text: 'Parameter name exceeds maximum length of 100 characters.')],
+        isError: true,
       );
+    }
+    if (email.length > 254) {
+      return CallToolResult(
+        content: [TextContent(text: 'Parameter email exceeds maximum length of 254 characters.')],
+        isError: true,
+      );
+    }
+    if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(email)) {
+      return CallToolResult(
+        content: [TextContent(text: 'Parameter email does not match required pattern.')],
+        isError: true,
+      );
+    }
+
+      final result = await user_store.UserStore.createUser(name: name, email: email);
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
@@ -299,17 +281,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _getUserTodos(CallToolRequest request) async {
     try {
-      final userId = request.arguments!['userId'] as int;
+    final userId = request.arguments!['userId'] as int;
+
 
       final result = await user_store.UserStore.getUserTodos(userId);
       return CallToolResult(
@@ -322,17 +302,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _getUser(CallToolRequest request) async {
     try {
-      final id = request.arguments!['id'] as int;
+    final id = request.arguments!['id'] as int;
+
 
       final result = await user_store.UserStore.getUser(id);
       return CallToolResult(
@@ -345,16 +323,16 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _listUsers(CallToolRequest request) async {
     try {
+
+
+
       final result = await user_store.UserStore.listUsers();
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
@@ -366,17 +344,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _deleteUser(CallToolRequest request) async {
     try {
-      final id = request.arguments!['id'] as int;
+    final id = request.arguments!['id'] as int;
+
 
       final result = await user_store.UserStore.deleteUser(id);
       return CallToolResult(
@@ -389,28 +365,20 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _searchUsers(CallToolRequest request) async {
     try {
-      final query = request.arguments!['q'] as String;
-      if (query.length > 1000) {
-        return CallToolResult(
-          content: [
-            TextContent(
-              text:
-                  'Parameter query exceeds maximum length of 1000 characters.',
-            ),
-          ],
-          isError: true,
-        );
-      }
+    final query = request.arguments!['q'] as String;
+    if (query.length > 1000) {
+      return CallToolResult(
+        content: [TextContent(text: 'Parameter query exceeds maximum length of 1000 characters.')],
+        isError: true,
+      );
+    }
 
       final result = await user_store.UserStore.searchUsers(query);
       return CallToolResult(
@@ -423,17 +391,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _createTodo(CallToolRequest request) async {
     try {
-      final title = request.arguments!['title'] as String;
+    final title = request.arguments!['title'] as String;
+
 
       final result = await todo_store.TodoStore.createTodo(title: title);
       return CallToolResult(
@@ -446,17 +412,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _getTodo(CallToolRequest request) async {
     try {
-      final id = request.arguments!['id'] as int;
+    final id = request.arguments!['id'] as int;
+
 
       final result = await todo_store.TodoStore.getTodo(id);
       return CallToolResult(
@@ -469,16 +433,16 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _listTodos(CallToolRequest request) async {
     try {
+
+
+
       final result = await todo_store.TodoStore.listTodos();
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
@@ -490,17 +454,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _deleteTodo(CallToolRequest request) async {
     try {
-      final id = request.arguments!['id'] as int;
+    final id = request.arguments!['id'] as int;
+
 
       final result = await todo_store.TodoStore.deleteTodo(id);
       return CallToolResult(
@@ -513,17 +475,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _completeTodo(CallToolRequest request) async {
     try {
-      final id = request.arguments!['id'] as int;
+    final id = request.arguments!['id'] as int;
+
 
       final result = await todo_store.TodoStore.completeTodo(id);
       return CallToolResult(
@@ -536,23 +496,18 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _assignTodoToUser(CallToolRequest request) async {
     try {
-      final todoId = request.arguments!['todoId'] as int;
-      final userId = request.arguments!['userId'] as int;
+    final todoId = request.arguments!['todoId'] as int;
+    final userId = request.arguments!['userId'] as int;
 
-      final result = await todo_store.TodoStore.assignTodoToUser(
-        todoId: todoId,
-        userId: userId,
-      );
+
+      final result = await todo_store.TodoStore.assignTodoToUser(todoId: todoId, userId: userId);
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
@@ -563,23 +518,18 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _removeTodoFromUser(CallToolRequest request) async {
     try {
-      final todoId = request.arguments!['todoId'] as int;
-      final userId = request.arguments!['userId'] as int;
+    final todoId = request.arguments!['todoId'] as int;
+    final userId = request.arguments!['userId'] as int;
 
-      final result = await todo_store.TodoStore.removeTodoFromUser(
-        todoId: todoId,
-        userId: userId,
-      );
+
+      final result = await todo_store.TodoStore.removeTodoFromUser(todoId: todoId, userId: userId);
       return CallToolResult(
         content: [TextContent(text: _serializeResult(result))],
       );
@@ -590,17 +540,15 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
-
   FutureOr<CallToolResult> _getTodosForUser(CallToolRequest request) async {
     try {
-      final userId = request.arguments!['userId'] as int;
+    final userId = request.arguments!['userId'] as int;
+
 
       final result = await todo_store.TodoStore.getTodosForUser(userId);
       return CallToolResult(
@@ -613,29 +561,28 @@ base class MCPServerWithTools extends MCPServer with ToolsSupport {
         await io.stderr.flush();
       }
       return CallToolResult(
-        content: [
-          TextContent(text: 'An error occurred while processing the request.'),
-        ],
+        content: [TextContent(text: 'An error occurred while processing the request.')],
         isError: true,
       );
     }
   }
+
+
+
+
 
   String _serializeResult(dynamic result) {
     if (result == null) return 'null';
     try {
       if (result is Map) return jsonEncode(result);
       if (result is List) {
-        final items = result
-            .map((e) {
-              if (e == null) return null;
-              if (e is Map) return e;
-              final toJson = e.toJson;
-              if (toJson != null && toJson is Function) return toJson();
-              return e.toString();
-            })
-            .where((e) => e != null)
-            .toList();
+        final items = result.map((e) {
+          if (e == null) return null;
+          if (e is Map) return e;
+          final toJson = e.toJson;
+          if (toJson != null && toJson is Function) return toJson();
+          return e.toString();
+        }).where((e) => e != null).toList();
         return jsonEncode(items);
       }
       final toJson = result.toJson;

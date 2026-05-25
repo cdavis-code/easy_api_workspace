@@ -13,12 +13,14 @@ Example demonstrating how to use `easy_api_annotations` and `easy_api_generator`
 - [Transport Modes](#transport-modes)
 - [Available Tools](#available-tools)
 - [Code Mode](#code-mode)
+- [CLI Application](#cli-application)
 - [Testing & Validation](#testing--validation)
   - [MCP Inspector (Recommended)](#1-mcp-inspector-recommended)
   - [MCP Inspector CLI Mode](#2-mcp-inspector-cli-mode)
   - [Manual curl Testing](#3-manual-curl-testing)
   - [stdio Pipe Testing](#4-stdio-pipe-testing)
   - [REST API Testing](#5-rest-api-testing)
+  - [CLI Application Testing](#6-cli-application-testing)
 - [Generated Artifacts](#generated-artifacts)
 - [Project Structure](#project-structure)
 - [Data Model](#data-model)
@@ -199,6 +201,27 @@ dart run example/bin/example.mcp.dart
 # Server listens on http://<address>:<port>
 ```
 
+**CLI Application:**
+
+To generate a standalone command-line application, add `generateCli: true` to your `@Server` annotation:
+
+```dart
+@Server(
+  transport: McpTransport.stdio,
+  generateCli: true,  // Generates .cli.dart
+)
+Future<void> main() async {
+  // Your initialization code...
+}
+```
+
+Then re-run the generator and execute the CLI:
+
+```bash
+dart run build_runner build --delete-conflicting-outputs
+dart run example/bin/example.cli.dart --help
+```
+
 ## Available Tools
 
 The generated MCP server exposes 14 tools organized by store:
@@ -239,6 +262,7 @@ The generated MCP server exposes 14 tools organized by store:
 | `generateMcp` | `bool` | `true` | Whether to generate the MCP server (`.mcp.dart`) |
 | `generateJson` | `bool` | `false` | Whether to generate `.mcp.json` tool-metadata file |
 | `generateRest` | `bool` | `false` | Whether to generate a REST API server (`.openapi.dart`) and OpenAPI 3.0 spec (`.openapi.json`) |
+| `generateCli` | `bool` | `false` | Whether to generate a runnable command-line app (`.cli.dart`) that exposes annotated `@Tool` methods as `package:args` `CommandRunner` subcommands |
 | `toolPrefix` | `String?` | `null` | Prefix added to all tool names (e.g., `'user_'` makes `createUser` → `user_createUser`) |
 | `autoClassPrefix` | `bool` | `false` | Automatically prefix tool names with class name (e.g., `UserService_createUser`) |
 | `codeMode` | `bool` | `false` | Enables `search`/`execute` tools backed by a Node.js sandbox for batch tool orchestration |
@@ -413,6 +437,129 @@ JSON.stringify(results, null, 2);
 - ✅ Tool filtering: Only tools with `codeMode != false` are exposed
 
 **Note:** Destructive operations like `deleteUser` have `@Tool(codeMode: false)` and are intentionally unavailable from code mode to prevent accidental data loss.
+
+---
+
+## 💻 CLI Application
+
+**CLI Application generation** creates a runnable command-line app (`<source>.cli.dart`) built on `package:args`'s `CommandRunner`. This is the fourth output type alongside MCP server, REST/OpenAPI, and OpenAPI specification.
+
+### What is CLI Generation?
+
+CLI generation transforms your annotated `@Tool` methods into a standalone command-line application where:
+- Each tool becomes a CLI command or subcommand
+- `@Parameter` annotations become CLI options with validation
+- Complex types accept JSON input via command-line arguments or file references
+- Results are emitted as pretty-printed JSON
+
+### How It Works
+
+When `@Server(generateCli: true)` is enabled, the generator produces a `.cli.dart` file with:
+
+1. **Command Structure**
+   - Tools inside a class → subcommands under a `kebab-case` command group
+   - Top-level tools → top-level commands
+   - Example: `UserStore.createUser` → `example user-store create-user`
+
+2. **Argument Handling**
+   - Each `@Parameter` becomes a CLI option with the same validation as MCP/REST
+   - Bool parameters → flags (`--verbose` / `--no-verbose`)
+   - `List<primitive>` → repeatable multi-options
+   - Custom classes → JSON literal or `@file` reference
+
+3. **Output and Exit Codes**
+   - Results: pretty-printed JSON by default
+   - `--compact` flag: single-line JSON output
+   - Exit codes: `0` (success), `64` (usage/validation error), `1` (internal error)
+   - When `logErrors: true`: error details written to stderr
+
+### CLI Generation Configuration
+
+```dart
+@Server(
+  generateCli: true,         // Enables .cli.dart generation
+  generateMcp: false,        // Optional: skip MCP if you only need CLI
+  // generateRest: true,     // Optional: combine with REST generation
+)
+Future<void> main() async {
+  // Your initialization code...
+}
+```
+
+### CLI Command Examples
+
+**View help:**
+```bash
+# Global help
+dart run example/bin/example.cli.dart --help
+
+# Command group help
+dart run example/bin/example.cli.dart user-store --help
+
+# Specific command help
+dart run example/bin/example.cli.dart user-store create-user --help
+```
+
+**Run commands:**
+```bash
+# List all users
+dart run example/bin/example.cli.dart user-store list-users
+
+# Create a user
+dart run example/bin/example.cli.dart user-store create-user \
+    --name="Alice" --email="alice@example.com"
+
+# Get user by ID
+dart run example/bin/example.cli.dart user-store get-user --id=1
+
+# Search users
+dart run example/bin/example.cli.dart user-store search-users --query="Alice"
+
+# Create a todo
+dart run example/bin/example.cli.dart todo-store create-todo --title="Buy milk"
+
+# Assign todo to user
+dart run example/bin/example.cli.dart todo-store assign-todo-to-user \
+    --todo-id=1 --user-id=1
+
+# Get todos for user
+dart run example/bin/example.cli.dart todo-store get-todos-for-user --user-id=1
+```
+
+**Compact output:**
+```bash
+dart run example/bin/example.cli.dart --compact user-store list-users
+```
+
+### Argument Types
+
+| Dart Type | CLI Shape | Example |
+|-----------|-----------|---------|
+| `bool` | `--flag` / `--no-flag` | `--verbose` / `--no-verbose` |
+| `String`, `int`, `double` | `--name=value` | `--name="Alice"`, `--id=1` |
+| `List<String>` | Repeatable option | `--tag=foo --tag=bar` |
+| Custom class | JSON literal | `--user='{"name":"Alice"}'` |
+| Custom class | File reference | `--user=@/path/to/user.json` |
+| `List<Custom>` | JSON array | `--users='[...]'` or `--users=@file.json` |
+
+### CLI Features
+
+- ✅ **Automatic command structure** — class-based tools become subcommand groups
+- ✅ **Full validation** — same `maxLength`, `pattern`, `minimum`, `maximum`, `enumValues` as MCP/REST
+- ✅ **Rich parameter metadata** — titles, descriptions, and examples from `@Parameter`
+- ✅ **Flexible input** — JSON literals, file references, or standard CLI options
+- ✅ **Pretty-printed output** — readable JSON by default, compact with `--compact`
+- ✅ **Unix-style exit codes** — `0` (success), `64` (usage error), `1` (internal error)
+- ✅ **Error logging** — optional stderr output with `logErrors: true`
+
+### Use Cases
+
+CLI generation is ideal for:
+- **Local development** — quickly test your tools without MCP clients
+- **Automation scripts** — integrate tools into bash scripts or CI/CD pipelines
+- **Data migration** — run batch operations from the command line
+- **Debugging** — isolate and test individual tool behavior
+- **Administrative tasks** — expose management tools as CLI commands
 
 ---
 
@@ -604,6 +751,79 @@ curl -s -X DELETE http://localhost:8080/todos/1
 
 **See** [TESTING.md § Testing REST API Servers](TESTING.md#testing-rest-api-servers) for detailed walkthroughs including HTTPie, GUI HTTP clients, OpenAPI-spec verification, MCP-vs-REST comparison, and common considerations (Content-Type headers, CORS, error handling, shared data persistence with the MCP server).
 
+### 6. CLI Application Testing
+
+**Best for**: Quick tool testing, automation scripts, CI/CD integration
+
+**Prerequisites:**
+First, enable CLI generation by adding `generateCli: true` to the `@Server` annotation in `bin/example.dart`, then regenerate:
+
+```bash
+dart run build_runner build --delete-conflicting-outputs
+```
+
+**Test individual commands:**
+```bash
+# View available commands
+dart run example/bin/example.cli.dart --help
+
+# List all users
+dart run example/bin/example.cli.dart user-store list-users
+
+# Create a user
+dart run example/bin/example.cli.dart user-store create-user \
+    --name="CLI Test User" --email="cli@test.com"
+
+# Get user by ID
+dart run example/bin/example.cli.dart user-store get-user --id=1
+
+# Create a todo
+dart run example/bin/example.cli.dart todo-store create-todo --title="Test CLI"
+
+# Assign todo to user
+dart run example/bin/example.cli.dart todo-store assign-todo-to-user \
+    --todo-id=1 --user-id=1
+
+# Get user's todos
+dart run example/bin/example.cli.dart user-store get-user-todos --user-id=1
+```
+
+**Test compact output:**
+```bash
+dart run example/bin/example.cli.dart --compact user-store list-users
+```
+
+**Test with JSON file input (for complex types):**
+```bash
+# Create a JSON file
+echo '{"name": "File Import User", "email": "file@test.com"}' > /tmp/user.json
+
+# Use file reference
+dart run example/bin/example.cli.dart user-store create-user \
+    --name="File Import User" --email="file@test.com"
+```
+
+**Verify exit codes:**
+```bash
+# Success (exit code 0)
+dart run example/bin/example.cli.dart user-store list-users
+echo $?  # Should print 0
+
+# Validation error (exit code 64)
+dart run example/bin/example.cli.dart user-store create-user --name="Test"
+echo $?  # Should print 64 (missing required --email)
+```
+
+**What You Can Test:**
+- ✅ Command structure and help text
+- ✅ All individual tool commands
+- ✅ Parameter validation (required, pattern, min/max, enum)
+- ✅ JSON input via command-line arguments
+- ✅ File reference input (`@file.json`)
+- ✅ Output formatting (pretty vs compact)
+- ✅ Exit codes for success and errors
+- ✅ Error messages and stderr logging
+
 ### Testing Checklist
 
 **Individual Tools (15 tools):**
@@ -679,6 +899,15 @@ Running `dart run build_runner build --delete-conflicting-outputs` from the proj
   - RESTful API documentation
   - Request/response schemas
   - Can be used with Swagger UI, client generators, and API gateways
+
+### CLI Application
+When `generateCli: true` is set on `@Server`:
+- **`example.cli.dart`** — Standalone command-line application
+  - Built on `package:args` `CommandRunner`
+  - Each `@Tool` becomes a CLI command or subcommand
+  - `@Parameter` annotations become CLI options with validation
+  - Pretty-printed JSON output by default
+  - Unix-style exit codes (0, 64, 1)
 
 ### Optional: a second entry point for a different transport
 
