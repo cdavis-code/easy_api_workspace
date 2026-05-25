@@ -4,13 +4,14 @@
   <img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/images/logo-banner.svg" width="400" alt="easy_api">
 </p>
 
-Build Runner generator that creates MCP server code, REST API servers, and OpenAPI 3.0 specs from annotated Dart classes.
+Build Runner generator that creates MCP server code, REST API servers, OpenAPI 3.0 specs, and command-line apps from annotated Dart classes.
 
 Processes Dart code annotated with the `easy_api_annotations` package to produce any combination of:
 - **MCP server** (`.mcp.dart`) — stdio or HTTP transport using `dart_mcp`
 - **MCP metadata** (`.mcp.json`) — tool/prompt schemas for AI clients
 - **REST API server** (`.openapi.dart`) — Shelf-based HTTP server
 - **OpenAPI 3.0 specification** (`.openapi.json`) — Swagger-compatible API docs
+- **Command-line app** (`.cli.dart`) — runnable CLI built on `package:args` `CommandRunner`
 
 - `@Server` — configures transport (stdio/HTTP), port/address, code mode, and which artifacts to generate.
 - `@Tool` — exposes a method as an MCP tool and/or REST endpoint, with optional custom naming, icons, and code-mode controls.
@@ -159,6 +160,69 @@ Either configuration generates a `.openapi.json` with RESTful endpoints:
 - ✅ Proper HTTP status codes (200, 201, 204, 400, 404)
 - ✅ Parameter metadata from `@Parameter` annotations
 - ✅ Compatible with Swagger UI, API gateways, and code generators
+
+### CLI Application Generation
+
+Set `generateCli: true` on `@Server` to generate a runnable command-line app
+(`<source>.cli.dart`) built on `package:args`'s `CommandRunner`. The CLI is
+independent of the MCP, REST, and OpenAPI artifacts — generate any
+combination you need.
+
+```dart
+@Server(
+  generateCli: true,         // Adds .cli.dart
+  generateMcp: false,        // Optional: skip MCP if you only need a CLI
+  // generateRest: true,     // Optional: combine with REST generation
+)
+Future<void> main() async { /* ... */ }
+```
+
+**Command structure**
+
+- Tools defined inside a class become subcommands under a `kebab-case`
+  command group named after the class. For example, a static method
+  `UserStore.createUser` becomes `example user-store create-user`.
+- Top-level tools (those defined as top-level functions) are exposed
+  directly as top-level commands. The resolved tool name is used, so any
+  `toolPrefix` or `autoClassPrefix` carries through.
+
+**Argument handling**
+
+Each parameter becomes a CLI option with the same validation as the MCP
+and REST artifacts (`maxLength`, `pattern`, `minimum`, `maximum`,
+`enumValues` → `addOption(allowed: ...)`).
+
+| Dart type | CLI shape |
+|-----------|-----------|
+| `bool` | `--flag` / `--no-flag` (`addFlag(negatable: true)`) |
+| `String`, `int`, `double`, `num` | `addOption('name', mandatory: true)` (or optional with default) |
+| `List<String>` / `List<int>` / etc. | `addMultiOption('name')` (repeatable) |
+| Custom class (e.g. `User`) | `--name='{...json...}'` or `--name=@/path/to/file.json` |
+| `List<Custom>` | JSON array literal or `@file` reference |
+| `Map<String, dynamic>` / `dynamic` | JSON literal or `@file` reference |
+
+The `@file` syntax mirrors `curl`: prefix the path with `@` and the CLI
+reads the file's contents and decodes it as JSON.
+
+**Output and exit codes**
+
+- Results are emitted as **pretty-printed JSON** by default. Pass the
+  global `--compact` flag to emit single-line JSON.
+- `null` results produce no output.
+- Exit codes follow Unix conventions: `0` on success, `64` on usage or
+  validation errors, `1` on internal errors.
+- When `logErrors: true` is set on `@Server`, the underlying error
+  message and stack trace are also written to stderr before the generic
+  message.
+
+```sh
+$ dart run bin/example.cli.dart --help
+$ dart run bin/example.cli.dart user-store list-users
+$ dart run bin/example.cli.dart user-store create-user \
+    --name="Alice" --email="alice@example.com"
+$ dart run bin/example.cli.dart --compact todo-store create-todo --title="Buy milk"
+$ dart run bin/example.cli.dart inventory add-item --item=@./item.json
+```
 
 ### Tool Annotations
 

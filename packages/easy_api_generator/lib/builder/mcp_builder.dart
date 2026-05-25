@@ -1,19 +1,23 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:build/build.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:analyzer/dart/constant/value.dart';
-import 'package:easy_api_generator/builder/templates.dart';
+import 'package:easy_api_generator/builder/stdio_template.dart';
+import 'package:easy_api_generator/builder/http_template.dart';
 import 'package:easy_api_generator/builder/openapi_builder.dart';
 import 'package:easy_api_generator/builder/openapi_dart_template.dart';
+import 'package:easy_api_generator/builder/cli_template.dart';
 
 /// Builder that generates MCP server code from @Server and @Tool annotations.
 ///
 /// This builder processes Dart files containing MCP annotations and generates:
 /// - `.mcp.dart` files containing the complete MCP server implementation
 /// - `.mcp.json` files containing tool metadata (if generateJson is true)
+/// - `.openapi.json` files containing OpenAPI 3.0 REST specifications (if generateRest is true)
+/// - `.openapi.dart` files containing REST API server implementations (if generateRest is true)
+/// - `.cli.dart` files containing CLI command-line applications (if generateCli is true)
 ///
 /// The builder supports two transport modes:
 /// - **stdio**: JSON-RPC over standard input/output (default)
@@ -28,7 +32,13 @@ import 'package:easy_api_generator/builder/openapi_dart_template.dart';
 class McpBuilder extends Builder {
   @override
   final buildExtensions = const {
-    '.dart': ['.mcp.dart', '.mcp.json', '.openapi.json', '.openapi.dart'],
+    '.dart': [
+      '.mcp.dart',
+      '.mcp.json',
+      '.openapi.json',
+      '.openapi.dart',
+      '.cli.dart',
+    ],
   };
 
   @override
@@ -121,6 +131,20 @@ class McpBuilder extends Builder {
       await buildStep.writeAsString(
         inputId.changeExtension('.openapi.dart'),
         openApiDartCode,
+      );
+    }
+
+    // Conditionally generate CLI application (gated by generateCli flag)
+    if (config.generateCli) {
+      final appName = inputId.pathSegments.last.replaceAll('.dart', '');
+      final cliCode = CliTemplate.generate(
+        tools,
+        appName: appName,
+        logErrors: config.logErrors,
+      );
+      await buildStep.writeAsString(
+        inputId.changeExtension('.cli.dart'),
+        cliCode,
       );
     }
   }
@@ -1098,6 +1122,7 @@ class McpBuilder extends Builder {
       generateJson: _peekBool(reader, 'generateJson') ?? false,
       generateMcp: _peekBool(reader, 'generateMcp') ?? true,
       generateRest: _peekBool(reader, 'generateRest') ?? false,
+      generateCli: _peekBool(reader, 'generateCli') ?? false,
       codeMode: _peekBool(reader, 'codeMode') ?? false,
       codeModeTimeout: _peekInt(reader, 'codeModeTimeout') ?? 30,
       logErrors: _peekBool(reader, 'logErrors') ?? false,
@@ -1342,6 +1367,7 @@ class _ServerConfig {
     required this.generateJson,
     required this.generateMcp,
     required this.generateRest,
+    required this.generateCli,
     required this.codeMode,
     required this.codeModeTimeout,
     required this.logErrors,
@@ -1357,6 +1383,7 @@ class _ServerConfig {
   final bool generateJson;
   final bool generateMcp;
   final bool generateRest;
+  final bool generateCli;
   final bool codeMode;
   final int codeModeTimeout;
   final bool logErrors;

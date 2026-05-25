@@ -1,3 +1,5 @@
+import 'package:easy_api_generator/builder/template_utils.dart';
+
 /// Builds `Schema.*` source code expressions from MCP parameter metadata.
 ///
 /// [SchemaBuilder] translates between three representations:
@@ -6,6 +8,7 @@
 /// 3. Ordered parameter lists with metadata → [buildObjectSchema]
 ///
 /// All methods are static; the class is used purely as a namespace.
+
 class SchemaBuilder {
   /// Private constructor — all operations are exposed as static helpers
   /// and this class is not meant to be instantiated.
@@ -159,7 +162,7 @@ class SchemaBuilder {
           '(got ${title.length} characters)',
         );
       }
-      params.add("title: '${_escapeString(title)}'");
+      params.add("title: '${escapeDartString(title)}'");
     }
 
     // Add description if present
@@ -171,7 +174,7 @@ class SchemaBuilder {
           '(got ${description.length} characters)',
         );
       }
-      params.add("description: '${_escapeString(description)}'");
+      params.add("description: '${escapeDartString(description)}'");
     }
 
     // Note: 'example' from @Parameter is not passed to Schema constructors
@@ -190,7 +193,7 @@ class SchemaBuilder {
     if (metadata['pattern'] != null) {
       final pattern = metadata['pattern'] as String;
       _validateRegexPattern(pattern);
-      params.add("pattern: '${_escapeString(pattern)}'");
+      params.add("pattern: '${escapeDartString(pattern)}'");
     }
 
     // Add enum values if present
@@ -205,7 +208,7 @@ class SchemaBuilder {
                   '(got ${v.length} characters): ${v.substring(0, 50)}...',
                 );
               }
-              return "'${_escapeString(v)}'";
+              return "'${escapeDartString(v)}'";
             }
             return v.toString();
           })
@@ -272,17 +275,5 @@ class SchemaBuilder {
     } catch (e) {
       throw ArgumentError('Invalid regex pattern: $pattern. Error: $e');
     }
-  }
-
-  /// Escapes special characters in a string for use in generated Dart code.
-  /// Handles backslashes, single quotes, newlines, carriage returns, tabs, and dollar signs.
-  static String _escapeString(String input) {
-    return input
-        .replaceAll('\\', '\\\\')
-        .replaceAll("'", "\\'")
-        .replaceAll('\n', '\\n')
-        .replaceAll('\r', '\\r')
-        .replaceAll('\t', '\\t')
-        .replaceAll('\$', '\\\$');
   }
 }

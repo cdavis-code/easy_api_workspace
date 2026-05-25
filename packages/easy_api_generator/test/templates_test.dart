@@ -1,4 +1,5 @@
-import 'package:easy_api_generator/builder/templates.dart';
+import 'package:easy_api_generator/builder/stdio_template.dart';
+import 'package:easy_api_generator/builder/http_template.dart';
 import 'package:easy_api_generator/builder/openapi_dart_template.dart';
 import 'package:test/test.dart';
 
@@ -598,9 +599,10 @@ void main() {
       expect(result, contains("import 'dart:io' as io;"));
     });
 
-    test('excludes dart:io import for custom address', () {
+    test('includes dart:io import for custom address', () {
+      // dart:io is always needed for PORT env var and error logging
       final result = HttpTemplate.generate(tools, 3000, '0.0.0.0');
-      expect(result, isNot(contains("import 'dart:io' as io;")));
+      expect(result, contains("import 'dart:io' as io;"));
     });
 
     test('includes MCPServer with ToolsSupport', () {

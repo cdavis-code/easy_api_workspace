@@ -10,5 +10,6 @@ builders:
         - .mcp.json
         - .openapi.dart
         - .openapi.json
+        - .cli.dart
     auto_apply: dependents
     build_to: source

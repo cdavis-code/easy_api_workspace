@@ -1,12 +1,6 @@
 // OpenAPI Dart REST server template generator.
 
-/// Escapes a string for embedding in a Dart single-quoted string literal.
-String _escapeDartString(String s) {
-  return s
-      .replaceAll('\\', '\\\\')
-      .replaceAll("'", "\\'")
-      .replaceAll('\$', '\\\$');
-}
+import 'package:easy_api_generator/builder/template_utils.dart';
 
 /// Generates a standalone REST API server (shelf_plus) whose
 /// endpoints match the OpenAPI specification already produced as `.openapi.json`.
@@ -121,7 +115,7 @@ class OpenApiDartTemplate {
     }
 
     // ── Address expression ───────────────────────────────────────────
-    final addressExpression = "'${_escapeDartString(address)}'";
+    final addressExpression = "'${escapeDartString(address)}'";
 
     // ── Assemble generated code ────────────────────────────────────────
     final allRoutes = [...fixedRoutes, ...paramRoutes].join('\n');
@@ -411,7 +405,7 @@ $responseCode
     bool isOptional,
   ) {
     final rawExpr =
-        "request.url.queryParameters['${_escapeDartString(externalName)}']";
+        "request.url.queryParameters['${escapeDartString(externalName)}']";
     if (isOptional) {
       final conversion = _convertFromStringNullable(name, type, rawExpr);
       return '    $conversion';
@@ -422,7 +416,7 @@ $responseCode
     lines.writeln('    if (${name}Raw == null) {');
     lines.writeln('      return Response(400,');
     lines.writeln(
-      "        body: jsonEncode({'error': \"Missing required query parameter '${_escapeDartString(externalName)}'\"}),",
+      "        body: jsonEncode({'error': \"Missing required query parameter '${escapeDartString(externalName)}'\"}),",
     );
     lines.writeln("        headers: {'Content-Type': 'application/json'},");
     lines.writeln('      );');
@@ -445,35 +439,35 @@ $responseCode
     if (isOptional) {
       switch (baseType) {
         case 'int':
-          return "    final $name = body['${_escapeDartString(externalName)}'] != null ? (body['${_escapeDartString(externalName)}'] as num).toInt() : null;";
+          return "    final $name = body['${escapeDartString(externalName)}'] != null ? (body['${escapeDartString(externalName)}'] as num).toInt() : null;";
         case 'double':
-          return "    final $name = body['${_escapeDartString(externalName)}'] != null ? (body['${_escapeDartString(externalName)}'] as num).toDouble() : null;";
+          return "    final $name = body['${escapeDartString(externalName)}'] != null ? (body['${escapeDartString(externalName)}'] as num).toDouble() : null;";
         case 'bool':
-          return "    final $name = body['${_escapeDartString(externalName)}'] as bool?;";
+          return "    final $name = body['${escapeDartString(externalName)}'] as bool?;";
         case 'String':
-          return "    final $name = body['${_escapeDartString(externalName)}'] as String?;";
+          return "    final $name = body['${escapeDartString(externalName)}'] as String?;";
         default:
           if (baseType.startsWith('List<')) {
-            return '    final $name = body[\'${_escapeDartString(externalName)}\'] as List<dynamic>?;';
+            return '    final $name = body[\'${escapeDartString(externalName)}\'] as List<dynamic>?;';
           }
-          return "    final $name = body['${_escapeDartString(externalName)}'];";
+          return "    final $name = body['${escapeDartString(externalName)}'];";
       }
     }
 
     switch (baseType) {
       case 'int':
-        return "    final $name = (body['${_escapeDartString(externalName)}'] as num).toInt();";
+        return "    final $name = (body['${escapeDartString(externalName)}'] as num).toInt();";
       case 'double':
-        return "    final $name = (body['${_escapeDartString(externalName)}'] as num).toDouble();";
+        return "    final $name = (body['${escapeDartString(externalName)}'] as num).toDouble();";
       case 'bool':
-        return "    final $name = body['${_escapeDartString(externalName)}'] as bool;";
+        return "    final $name = body['${escapeDartString(externalName)}'] as bool;";
       case 'String':
-        return "    final $name = body['${_escapeDartString(externalName)}'] as String;";
+        return "    final $name = body['${escapeDartString(externalName)}'] as String;";
       default:
         if (baseType.startsWith('List<')) {
-          return "    final $name = body['${_escapeDartString(externalName)}'] as List<dynamic>;";
+          return "    final $name = body['${escapeDartString(externalName)}'] as List<dynamic>;";
         }
-        return "    final $name = body['${_escapeDartString(externalName)}'];";
+        return "    final $name = body['${escapeDartString(externalName)}'];";
     }
   }
 

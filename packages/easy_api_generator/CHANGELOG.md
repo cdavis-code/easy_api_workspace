@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-05-25
+
+### Added
+- **CLI application generation** — fourth output type alongside MCP server,
+  REST/OpenAPI, and OpenAPI specification. Set `generateCli: true` on `@Server`
+  to emit `<source>.cli.dart`, a runnable command-line app built on
+  `package:args`'s `CommandRunner`.
+  - Tools defined inside a class become subcommands under a `kebab-case`
+    command group named after the class (`UserStore.createUser` →
+    `example user-store create-user`).
+  - Top-level tools are exposed directly as top-level commands (the resolved
+    tool name — including any `toolPrefix` — is used as the command name).
+  - Each `@Parameter` becomes a CLI option with the same validation as the
+    MCP and REST artifacts (`maxLength`, `pattern`, `minimum`, `maximum`,
+    `enumValues` → `addOption(allowed:)`).
+  - Bool parameters become flags (`--verbose` / `--no-verbose`).
+  - `List<primitive>` parameters become repeatable multi-options.
+  - Custom classes and `List<Custom>` accept curl-style input — either a
+    JSON literal (`--user='{"name":"Alice"}'`) or `--user=@/path/to/file.json`.
+  - Results are emitted as pretty-printed JSON by default; pass the global
+    `--compact` flag to emit single-line JSON.
+  - Exit codes follow Unix conventions: `0` on success, `64` on usage or
+    validation errors, `1` on internal errors. When `logErrors: true` is set
+    on `@Server`, the underlying error message and stack trace are also
+    written to stderr before the generic message.
+- New `CliTemplate` class in `lib/builder/cli_template.dart` and corresponding
+  unit tests in `test/cli_template_test.dart`.
+
+### Changed
+- `McpBuilder.buildExtensions` now also produces `.cli.dart`.
+
 ## [1.1.2] - 2026-05-25
 
 ### Fixed

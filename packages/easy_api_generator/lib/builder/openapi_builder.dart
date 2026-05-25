@@ -1,8 +1,11 @@
+import 'package:easy_api_generator/builder/template_utils.dart';
+
 /// Generates OpenAPI 3.0 specifications from MCP tool definitions.
 ///
-/// This builder transforms MCP tool metadata into RESTful OpenAPI 3.0 specifications
-/// following API design best practices. It intelligently maps tool operations to
-/// standard HTTP methods and resource-based URL patterns.
+/// This static utility transforms MCP tool metadata into RESTful OpenAPI 3.0
+/// specifications following API design best practices. It intelligently maps
+/// tool operations to standard HTTP methods and resource-based URL patterns.
+
 class OpenApiBuilder {
   /// Private constructor — all operations are exposed as static helpers
   /// and this class is not meant to be instantiated.
@@ -236,9 +239,9 @@ class OpenApiBuilder {
 
     return <String, dynamic>{
       'summary': 'Create a new $singularResource',
-      'operationId': 'create${_capitalize(singularResource)}',
+      'operationId': 'create${pascalCase(singularResource)}',
       'x-tool-name': tool['name'],
-      'tags': [_capitalize(resourceName)],
+      'tags': [pascalCase(resourceName)],
       'requestBody': <String, dynamic>{
         'required': true,
         'content': <String, dynamic>{
@@ -278,9 +281,9 @@ class OpenApiBuilder {
 
     return <String, dynamic>{
       'summary': 'List all $resourceName',
-      'operationId': 'list${_capitalize(resourceName)}',
+      'operationId': 'list${pascalCase(resourceName)}',
       'x-tool-name': tool['name'],
-      'tags': [_capitalize(resourceName)],
+      'tags': [pascalCase(resourceName)],
       'parameters': queryParameters,
       'responses': <String, dynamic>{
         '200': <String, dynamic>{
@@ -312,9 +315,9 @@ class OpenApiBuilder {
 
     return <String, dynamic>{
       'summary': 'Get a $singularResource by ID',
-      'operationId': 'get${_capitalize(singularResource)}',
+      'operationId': 'get${pascalCase(singularResource)}',
       'x-tool-name': tool['name'],
-      'tags': [_capitalize(resourceName)],
+      'tags': [pascalCase(resourceName)],
       'parameters': [
         <String, dynamic>{
           'name': 'id',
@@ -339,7 +342,7 @@ class OpenApiBuilder {
           },
         },
         '404': <String, dynamic>{
-          'description': '${_capitalize(singularResource)} not found',
+          'description': '${pascalCase(singularResource)} not found',
         },
       },
     };
@@ -355,9 +358,9 @@ class OpenApiBuilder {
 
     return <String, dynamic>{
       'summary': 'Update a $singularResource',
-      'operationId': 'update${_capitalize(singularResource)}',
+      'operationId': 'update${pascalCase(singularResource)}',
       'x-tool-name': tool['name'],
-      'tags': [_capitalize(resourceName)],
+      'tags': [pascalCase(resourceName)],
       'parameters': [
         <String, dynamic>{
           'name': 'id',
@@ -378,7 +381,7 @@ class OpenApiBuilder {
       'responses': <String, dynamic>{
         '200': <String, dynamic>{'description': 'Successfully updated'},
         '404': <String, dynamic>{
-          'description': '${_capitalize(singularResource)} not found',
+          'description': '${pascalCase(singularResource)} not found',
         },
         '400': <String, dynamic>{'description': 'Invalid request'},
       },
@@ -394,9 +397,9 @@ class OpenApiBuilder {
 
     return <String, dynamic>{
       'summary': 'Delete a $singularResource',
-      'operationId': 'delete${_capitalize(singularResource)}',
+      'operationId': 'delete${pascalCase(singularResource)}',
       'x-tool-name': tool['name'],
-      'tags': [_capitalize(resourceName)],
+      'tags': [pascalCase(resourceName)],
       'parameters': [
         <String, dynamic>{
           'name': 'id',
@@ -409,7 +412,7 @@ class OpenApiBuilder {
       'responses': <String, dynamic>{
         '204': <String, dynamic>{'description': 'Successfully deleted'},
         '404': <String, dynamic>{
-          'description': '${_capitalize(singularResource)} not found',
+          'description': '${pascalCase(singularResource)} not found',
         },
       },
     };
@@ -425,9 +428,9 @@ class OpenApiBuilder {
 
     return <String, dynamic>{
       'summary': 'Search $resourceName',
-      'operationId': 'search${_capitalize(resourceName)}',
+      'operationId': 'search${pascalCase(resourceName)}',
       'x-tool-name': tool['name'],
-      'tags': [_capitalize(resourceName)],
+      'tags': [pascalCase(resourceName)],
       'parameters': queryParameters,
       'responses': <String, dynamic>{
         '200': <String, dynamic>{
@@ -647,12 +650,6 @@ class OpenApiBuilder {
       default:
         return null;
     }
-  }
-
-  /// Capitalizes the first letter of a string.
-  static String _capitalize(String str) {
-    if (str.isEmpty) return str;
-    return str[0].toUpperCase() + str.substring(1);
   }
 
   /// Converts plural to singular.
