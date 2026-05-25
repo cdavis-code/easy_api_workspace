@@ -33,7 +33,7 @@ class HttpTemplate {
   /// [address] - The bind address (e.g., '127.0.0.1', '0.0.0.0')
   /// [codeMode] - Enable code mode with JavaScript sandbox (default: false)
   /// [codeModeTimeout] - Timeout for code mode execution in seconds (default: 30)
-  /// [corsOrigins] - Allowed CORS origins (default: ['*'] for backward compatibility)
+  /// [corsOrigins] - Allowed CORS origins (default: `['*']` for backward compatibility)
   ///
   /// Returns the complete server code as a Dart string.
   static String generate(
