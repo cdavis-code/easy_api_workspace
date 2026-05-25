@@ -94,6 +94,7 @@ Main server annotation with transport configuration:
 - `generateJson`: Generate .mcp.json metadata (default: false)
 - `generateMcp`: Generate .mcp.dart server (default: true)
 - `generateRest`: Generate .openapi.json REST spec (default: false)
+- `generateCli`: Generate .cli.dart command-line app (default: false)
 - `codeMode`: Enable batch tool orchestration via Node.js sandbox (default: false)
 - `codeModeTimeout`: Max execution time for code mode scripts in seconds (default: 30)
 - `toolPrefix`: Prefix all tool names (optional)
@@ -121,6 +122,8 @@ Note: @Parameter is optional - generator extracts info from Dart types by defaul
 - `.mcp.dart`: Complete MCP server implementation (stdio or HTTP)
 - `.mcp.json`: Tool metadata (only if `generateJson: true`)
 - `.openapi.json`: RESTful OpenAPI 3.0 specification (only if `generateRest: true`)
+- `.openapi.dart`: REST server implementation (only if `generateRest: true`)
+- `.cli.dart`: Runnable command-line app exposing tools as `package:args` `CommandRunner` subcommands (only if `generateCli: true`)
 
 ## Publishing Checklist
 

@@ -3,18 +3,19 @@
 </p>
 
 <p align="center">
-  <strong>A Dart code generator that transforms annotated functions into MCP servers and REST APIs.</strong>
+  <strong>A Dart code generator that transforms annotated functions into MCP servers, REST APIs, and CLI applications.</strong>
 </p>
 
 ## Overview
 
-Easy API allows you to expose Dart library functions as MCP tools and REST API endpoints using simple annotations. The generator produces ready-to-run stdio/HTTP MCP servers and/or REST API servers that comply with the MCP specification and OpenAPI 3.0 standard.
+Easy API allows you to expose Dart library functions as MCP tools, REST API endpoints, and command-line subcommands using simple annotations. The generator produces ready-to-run stdio/HTTP MCP servers, REST API servers, OpenAPI 3.0 specifications, and runnable CLI apps — any combination — from a single source of truth.
 
 ### What You Can Build
 
 - **MCP Servers** - Create AI-powered tools callable by Claude Desktop, Cursor, and other MCP clients via stdio or HTTP transport
 - **REST APIs** - Generate traditional HTTP REST endpoints with full OpenAPI 3.0 documentation for web/mobile applications
-- **Hybrid Solutions** - Serve both AI agents and traditional HTTP clients from the same annotated Dart code
+- **Command-Line Apps** - Generate a `package:args` `CommandRunner`-based CLI that exposes the same tools as kebab-case subcommands
+- **Hybrid Solutions** - Serve AI agents, traditional HTTP clients, and shell users from the same annotated Dart code
 - **Code Mode Orchestration** - Enable LLM-driven batch tool execution via sandboxed JavaScript for complex multi-step workflows
 
 ### Uses of Generated `.openapi.json`
@@ -40,6 +41,7 @@ The code generator can produce several different output files depending on your 
 | `.mcp.json` | `generateJson: true` | MCP tool metadata file describing available tools, their parameters, and schemas. Used by MCP clients to discover and understand tool capabilities without connecting to the server. |
 | `.openapi.json` | `generateRest: true` | OpenAPI 3.0 specification for RESTful API endpoints. Includes resource-based URLs, request/response schemas, proper HTTP status codes, and can be used with Swagger UI, API gateways, or client code generators. |
 | `.openapi.dart` | `generateRest: true` | Complete REST API server implementation using the Shelf web framework. Serves the REST endpoints defined in the OpenAPI spec. Runs as a standard HTTP server on the configured port. |
+| `.cli.dart` | `generateCli: true` | Runnable command-line application built on `package:args` `CommandRunner`. Each annotated class becomes a kebab-case command group, each `@Tool` method becomes a subcommand, and each parameter becomes a `--kebab-case` option. Complex parameters accept JSON inline (`--param='{...}'`) or via file (`--param=@file.json`). Output is pretty-printed JSON by default; `--compact` emits single-line JSON. |
 
 **Generation Flags on `@Server`:**
 
@@ -49,6 +51,7 @@ The code generator can produce several different output files depending on your 
   generateMcp: true,      // Generate .mcp.dart server (default: true)
   generateJson: false,    // Generate .mcp.json metadata (default: false)
   generateRest: false,    // Generate .openapi.json + .openapi.dart (default: false)
+  generateCli: false,     // Generate .cli.dart command-line app (default: false)
 )
 ```
 
@@ -61,7 +64,8 @@ example/
 │   ├── example.mcp.dart                # Generated MCP server (stdio)
 │   ├── example.mcp.json                # Generated tool metadata (optional)
 │   ├── example.openapi.dart            # Generated REST API server (optional)
-│   └── example.openapi.json            # Generated OpenAPI 3.0 spec (optional)
+│   ├── example.openapi.json            # Generated OpenAPI 3.0 spec (optional)
+│   └── example.cli.dart                # Generated CLI application (optional)
 └── lib/src/
     ├── user.dart                       # Domain models
     ├── user_store.dart                 # Business logic
@@ -73,7 +77,8 @@ example/
 
 - **MCP Server Only** (`generateMcp: true`): Build AI-powered applications that integrate with Claude Desktop, Cursor, or other MCP clients
 - **REST API Only** (`generateRest: true`): Create traditional HTTP APIs for web/mobile apps with full OpenAPI documentation
-- **Both MCP + REST** (`generateMcp: true, generateRest: true`): Serve both AI agents and traditional clients from the same annotated code
+- **CLI Application** (`generateCli: true`): Ship a runnable command-line tool that exposes the same tools to shell users, scripts, and CI pipelines
+- **Hybrid Distribution** (`generateMcp: true, generateRest: true, generateCli: true`): Serve AI agents, traditional HTTP clients, and shell users from the same annotated code
 - **Metadata Export** (`generateJson: true`): Share tool specifications with team members or use in CI/CD pipelines
 
 ### Known Caveats
@@ -199,6 +204,7 @@ Controls the transport type and configuration for the generated server.
   generateJson: true,            // Optional: generate .mcp.json metadata
   generateMcp: true,             // Default: true — generate .mcp.dart server
   generateRest: false,           // Default: false — generate .openapi.json REST spec
+  generateCli: false,            // Default: false — generate .cli.dart CLI application
   toolPrefix: 'user_service_',   // Optional: prefix all tool names
   autoClassPrefix: true,         // Optional: prefix with class name
   annotationsDefault: ToolAnnotations(  // Optional: server-wide defaults for tool hints

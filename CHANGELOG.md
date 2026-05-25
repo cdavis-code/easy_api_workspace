@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - Unreleased
+
+### Added
+- **CLI application generation** — fourth output type alongside MCP server,
+  REST/OpenAPI specification, and OpenAPI Dart server. Set `generateCli: true`
+  on `@Server` to emit `<source>.cli.dart`, a runnable command-line app
+  that exposes annotated `@Tool` methods as `package:args` `CommandRunner`
+  subcommands. Tools grouped by class become command groups
+  (e.g. `example user-store create-user`); top-level tools become top-level
+  commands. Custom-class arguments accept either a JSON literal
+  (`--item='{...}'`) or a curl-style file reference (`--item=@/path/to/file.json`).
+  Results are pretty-printed JSON by default, with `--compact` for
+  single-line output. (`easy_api_annotations` 1.2.0 / `easy_api_generator` 1.2.0)
+
 ## [0.6.1] - Unreleased
 
 ### Fixed
