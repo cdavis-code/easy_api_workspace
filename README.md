@@ -1,8 +1,4 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/images/logo-banner.svg" width="600" alt="easy_api">
-</p>
-
-<p align="center">
   <strong>A Dart code generator that transforms annotated functions into MCP servers, REST APIs, and CLI applications.</strong>
 </p>
 
@@ -125,7 +121,6 @@ example/
   - [Commands](#commands)
 - [Contributing](#contributing)
 - [License](#license)
-- [Support](#support)
 
 ## Packages
 
