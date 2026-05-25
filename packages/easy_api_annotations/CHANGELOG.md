@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-05-25
+
+### Added
+- New `generateCli` field on `@Server` (default `false`). When `true`,
+  `easy_api_generator` emits a fourth artifact, `<source>.cli.dart`, a
+  runnable command-line application that exposes annotated `@Tool` methods
+  as `package:args` `CommandRunner` subcommands. See the generator
+  CHANGELOG for the full feature list.
+- Added `args: ^2.7.0` as a runtime dependency so the generated CLI
+  application can compile against the same version of `package:args`
+  that the annotations package vendors.
+
 ## [1.1.0] - 2026-05-20
 
 ### Added
