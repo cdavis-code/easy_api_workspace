@@ -6,6 +6,17 @@
   <strong>A Dart code generator that transforms annotated functions into MCP servers, REST APIs, and CLI applications.</strong>
 </p>
 
+<p align="center">
+  <a href="https://buymeacoffee.com/cdavis" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 48px !important;width: 174px !important;" >
+  </a>
+</p>
+
+<p align="center">
+  <a href="packages/easy_api_annotations"><img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/packages/easy_api_annotations/images/banner.svg" width="45%" alt="easy_api_annotations"></a>
+  <a href="packages/easy_api_generator"><img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/packages/easy_api_generator/images/banner.svg" width="45%" alt="easy_api_generator"></a>
+</p>
+
 ## Overview
 
 Easy API allows you to expose Dart library functions as MCP tools, REST API endpoints, and command-line subcommands using simple annotations. The generator produces ready-to-run stdio/HTTP MCP servers, REST API servers, OpenAPI 3.0 specifications, and runnable CLI apps — any combination — from a single source of truth.
@@ -91,6 +102,8 @@ example/
   - [What You Can Build](#what-you-can-build)
   - [Uses of Generated `.openapi.json`](#uses-of-generated-openapijson)
   - [Generated Files and Artifacts](#generated-files-and-artifacts)
+  - [Known Caveats](#known-caveats)
+- [Table of Contents](#table-of-contents)
 - [Packages](#packages)
 - [Quick Start](#quick-start)
   - [1. Add Dependencies](#1-add-dependencies)
@@ -100,8 +113,9 @@ example/
 - [Annotations](#annotations)
   - [`@Server`](#server)
   - [`@Tool`](#tool)
+    - [Tool Annotations](#tool-annotations)
   - [`@Parameter` (Optional)](#parameter-optional)
-  - [`@Prompt` (MCP Prompts)](#prompt-mcp-prompts)
+  - [@Prompt (MCP Prompts)](#prompt-mcp-prompts)
   - [Code Mode](#code-mode)
   - [REST API Specification Generation](#rest-api-specification-generation)
 - [Features](#features)
@@ -531,10 +545,4 @@ Quick links:
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-## Support
 
-If you find this project useful, consider supporting its development:
-
-<a href="https://buymeacoffee.com/cdavis" target="_blank">
-  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" >
-</a>
