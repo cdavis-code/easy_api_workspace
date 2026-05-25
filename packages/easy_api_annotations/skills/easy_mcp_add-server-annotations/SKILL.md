@@ -1,15 +1,15 @@
 ---
 name: easy_mcp_add-server-annotations
-description: Add easy_api annotations (@Server, @Tool, @Parameter) to existing Dart code to expose methods as MCP tools or REST API endpoints. Use when converting Dart libraries to MCP/REST servers, adding tool exposure to existing functions, or when the user wants to make their Dart code callable via the Model Context Protocol or HTTP APIs.
+description: Add easy_api annotations (@Server, @Tool, @Parameter, @Prompt) to existing Dart code to expose methods as MCP tools, REST API endpoints, or CLI applications. Use when converting Dart libraries to MCP/REST/CLI servers, adding tool exposure to existing functions, or when the user wants to make their Dart code callable via the Model Context Protocol, HTTP APIs, or command-line interfaces.
 ---
 
 # Add Easy API Annotations to Dart Code
 
-Convert existing Dart methods into MCP tools or REST API endpoints using easy_api annotations.
+Convert existing Dart methods into MCP tools, REST API endpoints, or CLI applications using easy_api annotations.
 
 ## Overview
 
-This skill helps you add `@Server`, `@Tool`, and `@Parameter` annotations to existing Dart code, transforming it into an MCP server and/or REST API that can be called by AI assistants, MCP clients, or HTTP consumers.
+This skill helps you add `@Server`, `@Tool`, `@Parameter`, and `@Prompt` annotations to existing Dart code, transforming it into an MCP server, REST API, and/or CLI application that can be called by AI assistants, MCP clients, HTTP consumers, or shell users.
 
 > **Note:** `@Mcp` is still available as a deprecated typedef for backward compatibility. New code should use `@Server`.
 
@@ -33,11 +33,13 @@ Marks the entry point for MCP server and/or REST API generation.
   generateJson: false,            // generate .mcp.json metadata file (default: false)
   generateMcp: true,              // generate .mcp.dart MCP server (default: true)
   generateRest: false,            // generate .openapi.json + .openapi.dart REST server (default: false)
+  generateCli: false,             // generate .cli.dart CLI application (default: false)
   codeMode: false,                // enable JavaScript sandbox for batch tool orchestration (default: false)
   codeModeTimeout: 30,            // max execution time for code mode in seconds (default: 30)
   toolPrefix: 'api_',             // prefix all tool names (optional)
   autoClassPrefix: true,          // prefix with class name (optional)
   logErrors: false,               // log errors to stderr for debugging (default: false)
+  corsOrigins: ['*'],             // allowed CORS origins for HTTP transport (default: ['*'])
   annotationsDefault: ToolAnnotations(  // server-wide defaults for tool annotations (optional)
     openWorldHint: false,
   ),
@@ -51,6 +53,8 @@ Marks the entry point for MCP server and/or REST API generation.
 - `generateJson`: Whether to generate .mcp.json metadata file (default: false)
 - `generateMcp`: Whether to generate .mcp.dart MCP server (default: true)
 - `generateRest`: Whether to generate .openapi.json spec and .openapi.dart REST server (default: false)
+- `generateCli`: Whether to generate a .cli.dart command-line application using `package:args` `CommandRunner` (default: false). Each annotated class becomes a kebab-case command group, each `@Tool` method becomes a subcommand, and parameters become `--kebab-case` CLI options. Complex parameters accept JSON inline or via `@file.json`
+- `corsOrigins`: Allowed CORS origins for HTTP transport (default: `['*']`). Only used when `transport: McpTransport.http`. For production deployments, restrict to specific origins to prevent CSRF attacks
 - `codeMode`: Enable JavaScript sandbox for batch tool orchestration (default: **false**). Set to `true` to enable code mode with `search` and `execute` tools
 - `codeModeTimeout`: Max execution time for code mode in seconds (default: 30, only when codeMode: true)
 - `toolPrefix`: Prefix added to all tool names (e.g., 'user_' makes 'createUser' → 'user_createUser')
@@ -144,21 +148,73 @@ Provides rich metadata for individual parameters.
 
 ```dart
 @Parameter(
+  alias: 'email',               // Custom external name (optional)
   title: 'Email Address',
   description: 'A valid email address',
   example: 'user@example.com',
   pattern: r'^[\w\.-]+@[\w\.-]+\.\w+$',
+  maxLength: 254,               // Maximum string length
 )
 ```
 
 **Parameters:**
+- `alias`: Custom external name for this parameter (used in REST APIs, MCP schemas, and OpenAPI specs instead of the Dart parameter name)
 - `title`: Human-readable parameter name
 - `description`: Detailed explanation
 - `example`: Example value for guidance
 - `minimum`/`maximum`: Numeric validation bounds
 - `pattern`: Regex pattern for string validation
+- `maxLength`: Maximum length for string parameters
 - `sensitive`: Mark as sensitive (passwords, API keys)
 - `enumValues`: List of allowed values
+
+### @Prompt (MCP Prompts)
+User-invoked templates that generate structured messages for interacting with language models. Unlike `@Tool` methods (which are model-called), prompts are explicitly selected by users, typically as slash commands in MCP clients like Claude Desktop.
+
+```dart
+@Prompt(
+  title: 'Code Review',
+  description: 'Asks the LLM to analyze code quality and suggest improvements',
+)
+PromptResult codeReview({
+  @PromptArgument(
+    title: 'Source Code',
+    description: 'The code to review for quality and issues',
+  )
+  required String code,
+}) {
+  return PromptResult(
+    description: 'Code review prompt',
+    messages: [
+      PromptMessage(
+        role: PromptRole.user,
+        content: TextPromptContent(
+          'Please review this code:\n\n```\n$code\n```',
+        ),
+      ),
+    ],
+  );
+}
+```
+
+**`@Prompt` Parameters:**
+- `name`: Custom prompt name (defaults to method name)
+- `title`: Human-readable title shown in MCP clients
+- `description`: Description of what the prompt does (uses dartdoc if omitted)
+
+**`@PromptArgument` Parameters:**
+- `alias`: Custom external name for the argument
+- `title`: Human-readable label displayed in clients
+- `description`: Detailed explanation of the argument
+- `required`: Whether the argument is required (default: inferred from nullability — non-nullable parameters are required)
+
+**Content Types for `PromptMessage`:**
+- `TextPromptContent` — Plain text messages
+- `ImagePromptContent` — Base64-encoded images with MIME type
+- `AudioPromptContent` — Base64-encoded audio with MIME type
+- `ResourcePromptContent` — Embedded server-side resources with URI and MIME type
+
+**Important Limitation:** Libraries containing **only** prompts (no `@Tool` methods) must be explicitly imported in the file with the `@Server` annotation. The generator extracts prompts from imported libraries, but only if those libraries are already imported for other reasons.
 
 ## Workflow
 
@@ -194,6 +250,7 @@ import 'package:easy_api_annotations/mcp_annotations.dart';
   transport: McpTransport.stdio,
   generateMcp: true,    // Generate MCP server
   generateRest: false,  // Set true to also generate REST API
+  generateCli: false,   // Set true to also generate CLI application
   // codeMode: false is the default - all tools will be listed in tools/list
 )
 class UserService {
@@ -318,6 +375,7 @@ This generates:
 - `{file}.mcp.json` - Tool metadata (when `generateJson: true`)
 - `{file}.openapi.json` - OpenAPI 3.0 REST specification (when `generateRest: true`)
 - `{file}.openapi.dart` - Complete REST API server (when `generateRest: true`)
+- `{file}.cli.dart` - Command-line application using `package:args` `CommandRunner` (when `generateCli: true`)
 
 > **Note on Code Mode**: By default, `codeMode: false` means all your `@Tool` methods will be listed in the standard `tools/list` response and directly callable by MCP clients. To enable code mode (which hides tools behind `search` and `execute` orchestration tools), explicitly set `codeMode: true` on `@Server`.
 
@@ -459,6 +517,8 @@ class StringUtils {
     - Set `openWorldHint: false` for tools that only interact with local/closed systems
     - Set `idempotentHint: true` for safe-to-retry operations (e.g., PUT-style updates)
 12. **Use Server-Wide Defaults**: When most tools share the same annotation hints, set `annotationsDefault` on `@Server` to reduce boilerplate. Individual tools can still override specific hints.
+13. **Generate CLI for Shell Users**: Set `generateCli: true` on `@Server` to generate a `package:args` `CommandRunner`-based CLI application. Classes become kebab-case command groups, `@Tool` methods become subcommands, and parameters become `--kebab-case` options. Output is pretty-printed JSON by default; `--compact` emits single-line JSON for piping.
+14. **Ship Multiple Artifacts**: Set `generateMcp`, `generateRest`, and `generateCli` together on the same `@Server` to serve AI agents, traditional HTTP clients, and shell users from a single annotated source.
 
 ## Troubleshooting
 
@@ -484,6 +544,7 @@ When converting existing code:
 - [ ] Add `@Parameter` for complex parameter validation (optional)
 - [ ] Configure `toolPrefix` or `autoClassPrefix` if needed to avoid naming collisions
 - [ ] Set `generateRest: true` if you want REST API generation
+- [ ] Set `generateCli: true` if you want CLI application generation
 - [ ] Set `codeMode: true` if you want JavaScript sandbox for batch orchestration
 - [ ] Run `dart run build_runner build`
 - [ ] Test the generated server(s)
