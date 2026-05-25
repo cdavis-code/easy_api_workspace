@@ -496,6 +496,24 @@ void main() {
         ),
       );
     });
+
+    test('optional dynamic parameter does not emit dynamic?', () {
+      final result = StdioTemplate.generate([
+        toolWithParam(<String, dynamic>{
+          'name': 'data',
+          'type': 'dynamic',
+          'schemaMap': <String, dynamic>{},
+          'isOptional': true,
+          'isNullable': false,
+          'defaultValueCode': null,
+        }),
+      ]);
+      expect(
+        result,
+        contains("final data = request.arguments?['data'] as dynamic;"),
+      );
+      expect(result, isNot(contains('dynamic?')));
+    });
   });
 
   group('Tool description escaping', () {

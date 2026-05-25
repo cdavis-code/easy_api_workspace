@@ -761,7 +761,10 @@ String renderMcpParamExtraction(Map<String, dynamic> p, String dartType) {
     return "    final $paramName = request.arguments!['$externalName'] as $dartType;";
   }
 
-  final nullableCast = dartType.endsWith('?') ? dartType : '$dartType?';
+  // dynamic is inherently nullable — no ? suffix needed
+  final nullableCast = (dartType.endsWith('?') || dartType == 'dynamic')
+      ? dartType
+      : '$dartType?';
 
   if (defaultCode != null) {
     return "    final $paramName = (request.arguments?['$externalName'] as $nullableCast) ?? $defaultCode;";

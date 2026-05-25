@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-05-25
+
+### Fixed
+- Generated MCP server code no longer emits `as dynamic?` casts for optional
+  `dynamic`-typed parameters. `dynamic` is inherently nullable in Dart, so the
+  `?` suffix was redundant and triggered `unnecessary_question_mark` lint
+  warnings (15+ instances per generated file), which deducted 20 points from
+  the pana static-analysis score.
+
 ## [1.2.0] - 2026-05-25
 
 ### Added
