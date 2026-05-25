@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io' as dart_io;
+
 import 'package:build/build.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:analyzer/dart/element/element.dart';
@@ -9,6 +11,7 @@ import 'package:easy_api_generator/builder/http_template.dart';
 import 'package:easy_api_generator/builder/openapi_builder.dart';
 import 'package:easy_api_generator/builder/openapi_dart_template.dart';
 import 'package:easy_api_generator/builder/cli_template.dart';
+import 'package:easy_api_generator/builder/template_utils.dart';
 
 /// Builder that generates MCP server code from @Server and @Tool annotations.
 ///
@@ -91,10 +94,10 @@ class McpBuilder extends Builder {
               prompts: prompts,
             );
 
-      // Write the generated server code
+      // Write the generated server code (formatted)
       await buildStep.writeAsString(
         inputId.changeExtension('.mcp.dart'),
-        generated,
+        await _formatDartCode(generated),
       );
 
       // Optionally generate JSON metadata file
@@ -120,7 +123,7 @@ class McpBuilder extends Builder {
         const JsonEncoder.withIndent('  ').convert(openApiSpec),
       );
 
-      // Generate .openapi.dart REST server
+      // Generate .openapi.dart REST server (formatted)
       final openApiDartCode = OpenApiDartTemplate.generate(
         tools,
         config.port,
@@ -130,7 +133,7 @@ class McpBuilder extends Builder {
       );
       await buildStep.writeAsString(
         inputId.changeExtension('.openapi.dart'),
-        openApiDartCode,
+        await _formatDartCode(openApiDartCode),
       );
     }
 
@@ -144,7 +147,7 @@ class McpBuilder extends Builder {
       );
       await buildStep.writeAsString(
         inputId.changeExtension('.cli.dart'),
-        cliCode,
+        await _formatDartCode(cliCode),
       );
     }
   }
@@ -184,8 +187,14 @@ class McpBuilder extends Builder {
       // Get the return type string, unwrapping Future<T> if async
       final returnType = _getTypeString(element.returnType);
 
+      // Pre-compute a camelCase variant for use as a Dart handler name.
+      // The original tool name (which may be snake_case, e.g. from OBS
+      // WebSocket request names) is kept for the MCP wire protocol string.
+      final camelCaseHandlerName = snakeToCamelCase(toolName);
+
       tools.add(<String, dynamic>{
         'name': toolName,
+        'camelCaseHandlerName': camelCaseHandlerName,
         'methodName': element.name ?? 'unnamed',
         'description': description,
         'parameters': parameters,
@@ -240,8 +249,12 @@ class McpBuilder extends Builder {
         // Get the return type string, unwrapping Future<T> if async
         final returnType = _getTypeString(method.returnType);
 
+        // Pre-compute a camelCase variant for use as a Dart handler name.
+        final camelCaseHandlerName = snakeToCamelCase(toolName);
+
         tools.add(<String, dynamic>{
           'name': toolName,
+          'camelCaseHandlerName': camelCaseHandlerName,
           'methodName': method.name ?? 'unnamed',
           'description': description,
           'parameters': parameters,
@@ -1351,6 +1364,35 @@ class McpBuilder extends Builder {
     }
 
     return validatedOrigins.isEmpty ? ['*'] : validatedOrigins;
+  }
+
+  /// Formats Dart source code by shelling out to `dart format`.
+  ///
+  /// Writes [source] to a temporary file, runs `dart format --output=write`
+  /// on it, and reads the formatted result. Returns the original [source]
+  /// unchanged if formatting fails (e.g. `dart` not on PATH or the source
+  /// contains a syntax error). The temp directory is always cleaned up.
+  static Future<String> _formatDartCode(String source) async {
+    final tempDir = await dart_io.Directory.systemTemp.createTemp(
+      'easy_api_format_',
+    );
+    final tempFile = dart_io.File('${tempDir.path}/_format.dart');
+    try {
+      await tempFile.writeAsString(source);
+      final result = await dart_io.Process.run('dart', [
+        'format',
+        '--output=write',
+        tempFile.path,
+      ]);
+      if (result.exitCode == 0) {
+        return await tempFile.readAsString();
+      }
+      return source; // Fall back to unformatted if dart format fails
+    } on Exception catch (_) {
+      return source; // Fall back if dart is unavailable
+    } finally {
+      await tempDir.delete(recursive: true);
+    }
   }
 }
 

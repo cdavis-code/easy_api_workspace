@@ -77,6 +77,7 @@ class StdioTemplate {
     final toolRegistrations = listedTools
         .map((t) {
           final name = t['name'] as String;
+          final camelHandlerName = t['camelCaseHandlerName'] as String? ?? name;
           final description = (t['description'] as String?) ?? 'Tool $name';
           final schema = SchemaBuilder.buildObjectSchema(
             (t['parameters'] as List<Map<String, dynamic>>? ?? []),
@@ -89,7 +90,7 @@ class StdioTemplate {
         description: '${escapeDartString(description)}',
         inputSchema: $schema,$annotationsExpr
       ),
-      _$name,
+      _$camelHandlerName,
     );''';
         })
         .join('\n');
@@ -101,6 +102,7 @@ class StdioTemplate {
     final toolHandlers = handlerTools
         .map((t) {
           final name = t['name'] as String;
+          final camelHandlerName = t['camelCaseHandlerName'] as String? ?? name;
           final params = t['parameters'] as List<Map<String, dynamic>>? ?? [];
           final paramExtractions = params
               .map((p) {
@@ -153,7 +155,7 @@ class StdioTemplate {
           }
 
           return '''
-  FutureOr<CallToolResult> _$name(CallToolRequest request) async {
+  FutureOr<CallToolResult> _$camelHandlerName(CallToolRequest request) async {
     try {
 $paramExtractions
 $paramValidations

@@ -8,7 +8,6 @@ import 'dart:io' as io;
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 
-
 import 'package:mcp_example/src/user_store.dart' as user_store;
 import 'package:mcp_example/src/todo_store.dart' as todo_store;
 
@@ -22,7 +21,8 @@ Future<void> main(List<String> argv) async {
   runner.argParser.addFlag(
     'compact',
     negatable: false,
-    help: 'Emit results as compact (single-line) JSON instead of pretty-printed.',
+    help:
+        'Emit results as compact (single-line) JSON instead of pretty-printed.',
   );
   runner.addCommand(_UserStoreGroupCommand());
   runner.addCommand(_TodoStoreGroupCommand());
@@ -35,8 +35,6 @@ Future<void> main(List<String> argv) async {
     io.exit(64);
   }
 }
-
-
 
 /// Serializes [result] for stdout. Defaults to pretty-printed JSON; with
 /// the global `--compact` flag, emits single-line JSON.
@@ -123,7 +121,6 @@ class _TodoStoreGroupCommand extends Command<int> {
   }
 }
 
-
 class _UserStoreCreateUserCommand extends Command<int> {
   @override
   String get name => 'create-user';
@@ -132,8 +129,16 @@ class _UserStoreCreateUserCommand extends Command<int> {
 
   _UserStoreCreateUserCommand() {
     argParser
-      ..addOption('name', mandatory: true, help: 'The user\'s full name (1-100 characters)')
-      ..addOption('email', mandatory: true, help: 'A valid email address for the user');
+      ..addOption(
+        'name',
+        mandatory: true,
+        help: 'The user\'s full name (1-100 characters)',
+      )
+      ..addOption(
+        'email',
+        mandatory: true,
+        help: 'A valid email address for the user',
+      );
   }
 
   @override
@@ -143,15 +148,22 @@ class _UserStoreCreateUserCommand extends Command<int> {
       final name = r['name'] as String;
       final email = r['email'] as String;
       if (name.length > 100) {
-        return _usageError('Parameter name exceeds maximum length of 100 characters.');
+        return _usageError(
+          'Parameter name exceeds maximum length of 100 characters.',
+        );
       }
       if (email.length > 254) {
-        return _usageError('Parameter email exceeds maximum length of 254 characters.');
+        return _usageError(
+          'Parameter email exceeds maximum length of 254 characters.',
+        );
       }
       if (!RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$').hasMatch(email)) {
         return _usageError('Parameter email does not match required pattern.');
       }
-      final result = await user_store.UserStore.createUser(name: name, email: email);
+      final result = await user_store.UserStore.createUser(
+        name: name,
+        email: email,
+      );
       _emitResult(result, globalResults);
       return 0;
     } catch (e, st) {
@@ -167,8 +179,7 @@ class _UserStoreGetUserTodosCommand extends Command<int> {
   String get description => 'Get all todos assigned to a user';
 
   _UserStoreGetUserTodosCommand() {
-    argParser
-      ..addOption('user-id', mandatory: true, help: '');
+    argParser..addOption('user-id', mandatory: true, help: '');
   }
 
   @override
@@ -193,8 +204,7 @@ class _UserStoreGetUserCommand extends Command<int> {
   String get description => 'Get user by ID';
 
   _UserStoreGetUserCommand() {
-    argParser
-      ..addOption('id', mandatory: true, help: '');
+    argParser..addOption('id', mandatory: true, help: '');
   }
 
   @override
@@ -218,16 +228,13 @@ class _UserStoreListUsersCommand extends Command<int> {
   @override
   String get description => 'List all users';
 
-  _UserStoreListUsersCommand() {
-
-  }
+  _UserStoreListUsersCommand() {}
 
   @override
   Future<int> run() async {
     try {
       // ignore: unused_local_variable
       final r = argResults!;
-
 
       final result = await user_store.UserStore.listUsers();
       _emitResult(result, globalResults);
@@ -245,8 +252,7 @@ class _UserStoreDeleteUserCommand extends Command<int> {
   String get description => 'Delete a user';
 
   _UserStoreDeleteUserCommand() {
-    argParser
-      ..addOption('id', mandatory: true, help: '');
+    argParser..addOption('id', mandatory: true, help: '');
   }
 
   @override
@@ -271,8 +277,11 @@ class _UserStoreSearchUsersCommand extends Command<int> {
   String get description => 'Search users by query';
 
   _UserStoreSearchUsersCommand() {
-    argParser
-      ..addOption('q', mandatory: true, help: 'Text to search for in user names and emails (max 1000 characters)');
+    argParser..addOption(
+      'q',
+      mandatory: true,
+      help: 'Text to search for in user names and emails (max 1000 characters)',
+    );
   }
 
   @override
@@ -281,7 +290,9 @@ class _UserStoreSearchUsersCommand extends Command<int> {
       final r = argResults!;
       final query = r['q'] as String;
       if (query.length > 1000) {
-        return _usageError('Parameter query exceeds maximum length of 1000 characters.');
+        return _usageError(
+          'Parameter query exceeds maximum length of 1000 characters.',
+        );
       }
       final result = await user_store.UserStore.searchUsers(query);
       _emitResult(result, globalResults);
@@ -299,8 +310,7 @@ class _TodoStoreCreateTodoCommand extends Command<int> {
   String get description => 'Create a new todo';
 
   _TodoStoreCreateTodoCommand() {
-    argParser
-      ..addOption('title', mandatory: true, help: '');
+    argParser..addOption('title', mandatory: true, help: '');
   }
 
   @override
@@ -325,8 +335,7 @@ class _TodoStoreGetTodoCommand extends Command<int> {
   String get description => 'Get todo by ID';
 
   _TodoStoreGetTodoCommand() {
-    argParser
-      ..addOption('id', mandatory: true, help: '');
+    argParser..addOption('id', mandatory: true, help: '');
   }
 
   @override
@@ -350,16 +359,13 @@ class _TodoStoreListTodosCommand extends Command<int> {
   @override
   String get description => 'List all todos';
 
-  _TodoStoreListTodosCommand() {
-
-  }
+  _TodoStoreListTodosCommand() {}
 
   @override
   Future<int> run() async {
     try {
       // ignore: unused_local_variable
       final r = argResults!;
-
 
       final result = await todo_store.TodoStore.listTodos();
       _emitResult(result, globalResults);
@@ -377,8 +383,7 @@ class _TodoStoreDeleteTodoCommand extends Command<int> {
   String get description => 'Delete a todo';
 
   _TodoStoreDeleteTodoCommand() {
-    argParser
-      ..addOption('id', mandatory: true, help: '');
+    argParser..addOption('id', mandatory: true, help: '');
   }
 
   @override
@@ -403,8 +408,7 @@ class _TodoStoreCompleteTodoCommand extends Command<int> {
   String get description => 'Mark a todo as completed';
 
   _TodoStoreCompleteTodoCommand() {
-    argParser
-      ..addOption('id', mandatory: true, help: '');
+    argParser..addOption('id', mandatory: true, help: '');
   }
 
   @override
@@ -441,7 +445,10 @@ class _TodoStoreAssignTodoToUserCommand extends Command<int> {
       final todoId = int.parse((r['todo-id'] as String?)!);
       final userId = int.parse((r['user-id'] as String?)!);
 
-      final result = await todo_store.TodoStore.assignTodoToUser(todoId: todoId, userId: userId);
+      final result = await todo_store.TodoStore.assignTodoToUser(
+        todoId: todoId,
+        userId: userId,
+      );
       _emitResult(result, globalResults);
       return 0;
     } catch (e, st) {
@@ -469,7 +476,10 @@ class _TodoStoreRemoveTodoFromUserCommand extends Command<int> {
       final todoId = int.parse((r['todo-id'] as String?)!);
       final userId = int.parse((r['user-id'] as String?)!);
 
-      final result = await todo_store.TodoStore.removeTodoFromUser(todoId: todoId, userId: userId);
+      final result = await todo_store.TodoStore.removeTodoFromUser(
+        todoId: todoId,
+        userId: userId,
+      );
       _emitResult(result, globalResults);
       return 0;
     } catch (e, st) {
@@ -485,8 +495,7 @@ class _TodoStoreGetTodosForUserCommand extends Command<int> {
   String get description => 'Get all todos assigned to a user';
 
   _TodoStoreGetTodosForUserCommand() {
-    argParser
-      ..addOption('user-id', mandatory: true, help: '');
+    argParser..addOption('user-id', mandatory: true, help: '');
   }
 
   @override
@@ -503,4 +512,3 @@ class _TodoStoreGetTodosForUserCommand extends Command<int> {
     }
   }
 }
-

@@ -1,6 +1,7 @@
 import 'package:easy_api_generator/builder/stdio_template.dart';
 import 'package:easy_api_generator/builder/http_template.dart';
 import 'package:easy_api_generator/builder/openapi_dart_template.dart';
+import 'package:easy_api_generator/builder/template_utils.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -1021,6 +1022,113 @@ void main() {
         expect(result, contains('io.Platform.isLinux'));
         expect(result, contains('io.Platform.isMacOS'));
       });
+    });
+  });
+
+  group('snakeToCamelCase', () {
+    test('converts snake_case to camelCase', () {
+      expect(snakeToCamelCase('obs_scenes_list'), 'obsScenesList');
+      expect(
+        snakeToCamelCase('obs_inputs_set_settings'),
+        'obsInputsSetSettings',
+      );
+    });
+
+    test('preserves already camelCase names', () {
+      expect(snakeToCamelCase('getUser'), 'getUser');
+      expect(snakeToCamelCase('createUser'), 'createUser');
+      expect(snakeToCamelCase('PascalCase'), 'PascalCase');
+    });
+
+    test('preserves leading underscores for private names', () {
+      expect(snakeToCamelCase('_internal'), '_internal');
+      expect(snakeToCamelCase('_obs_scenes_list'), '_obsScenesList');
+    });
+
+    test('handles empty and edge-case inputs', () {
+      expect(snakeToCamelCase(''), '');
+      expect(snakeToCamelCase('___'), '___');
+      expect(snakeToCamelCase('foo___bar'), 'fooBar');
+    });
+
+    test('handles single-segment names', () {
+      expect(snakeToCamelCase('search'), 'search');
+      expect(snakeToCamelCase('execute'), 'execute');
+    });
+
+    test('lowercases all segments appropriately', () {
+      expect(snakeToCamelCase('OBS_SCENES_LIST'), 'obsScenesList');
+      expect(snakeToCamelCase('GET_USER'), 'getUser');
+    });
+  });
+
+  group('camelCase handler names in generated output', () {
+    Map<String, dynamic> snakeCaseTool(
+      String name, {
+      String? className,
+      bool isStatic = false,
+    }) => <String, dynamic>{
+      'name': name,
+      'camelCaseHandlerName': snakeToCamelCase(name),
+      'methodName': 'list',
+      'description': 'Tool $name',
+      'parameters': <Map<String, dynamic>>[],
+      'isAsync': true,
+      'sourceImport': 'package:example/store.dart',
+      'sourceAlias': 'store',
+      // ignore: use_null_aware_elements
+      if (className != null) 'className': className,
+      'isStatic': isStatic,
+    };
+
+    test('StdioTemplate uses camelCase for handler method names', () {
+      final result = StdioTemplate.generate([snakeCaseTool('obs_scenes_list')]);
+      // Handler method should use camelCase Dart identifier
+      expect(result, contains('FutureOr<CallToolResult> _obsScenesList('));
+      // MCP wire protocol name stays snake_case
+      expect(result, contains("name: 'obs_scenes_list'"));
+      // Registration passes camelCase handler
+      expect(result, contains('_obsScenesList,'));
+    });
+
+    test('StdioTemplate with already-camelCase names keeps them camelCase', () {
+      final result = StdioTemplate.generate([
+        snakeCaseTool('getUser'),
+        snakeCaseTool('createUser'),
+      ]);
+      expect(result, contains('FutureOr<CallToolResult> _getUser('));
+      expect(result, contains('FutureOr<CallToolResult> _createUser('));
+      expect(result, contains("name: 'getUser'"));
+      expect(result, contains("name: 'createUser'"));
+    });
+
+    test('HttpTemplate uses camelCase for handler method names', () {
+      final result = HttpTemplate.generate(
+        [snakeCaseTool('obs_inputs_set_settings')],
+        3000,
+        '127.0.0.1',
+      );
+      expect(
+        result,
+        contains('FutureOr<CallToolResult> _obsInputsSetSettings('),
+      );
+      expect(result, contains("name: 'obs_inputs_set_settings'"));
+      expect(result, contains('_obsInputsSetSettings,'));
+    });
+
+    test('multiple snake_case tools all get unique camelCase handlers', () {
+      final result = StdioTemplate.generate([
+        snakeCaseTool('obs_scenes_list'),
+        snakeCaseTool('obs_inputs_set_settings'),
+        snakeCaseTool('obs_outputs_get_status'),
+      ]);
+      expect(result, contains('_obsScenesList'));
+      expect(result, contains('_obsInputsSetSettings'));
+      expect(result, contains('_obsOutputsGetStatus'));
+      // All MCP names stay snake_case
+      expect(result, contains("name: 'obs_scenes_list'"));
+      expect(result, contains("name: 'obs_inputs_set_settings'"));
+      expect(result, contains("name: 'obs_outputs_get_status'"));
     });
   });
 }

@@ -85,6 +85,54 @@ String pascalCase(String s) {
   return s[0].toUpperCase() + s.substring(1);
 }
 
+/// Converts a snake_case string to lowerCamelCase.
+///
+/// Preserves existing camelCase/PascalCase identifiers unchanged (no underscores
+/// means no transformation). Leading and trailing underscores are preserved.
+/// Consecutive underscores produce empty segments which are skipped.
+///
+/// Examples:
+/// - `obs_scenes_list` → `obsScenesList`
+/// - `getUser` → `getUser` (unchanged)
+/// - `_internal` → `_internal` (unchanged — single segment)
+/// - `foo___bar` → `fooBar` (consecutive underscores collapsed)
+String snakeToCamelCase(String input) {
+  if (input.isEmpty) return input;
+
+  // Preserve leading underscore(s) — common for private Dart members.
+  var leadingUnderscores = 0;
+  while (leadingUnderscores < input.length &&
+      input[leadingUnderscores] == '_') {
+    leadingUnderscores++;
+  }
+
+  final rest = input.substring(leadingUnderscores);
+  if (!rest.contains('_')) {
+    // No underscores in the body — already camelCase or PascalCase.
+    return input;
+  }
+
+  final parts = rest.split('_').where((p) => p.isNotEmpty).toList();
+  if (parts.isEmpty) return input; // Only underscores
+
+  final buffer = StringBuffer();
+  // Preserve leading underscores
+  for (var i = 0; i < leadingUnderscores; i++) {
+    buffer.write('_');
+  }
+  // First segment stays lowercase
+  buffer.write(parts.first.toLowerCase());
+  // Subsequent segments get capitalized
+  for (var i = 1; i < parts.length; i++) {
+    final part = parts[i];
+    buffer.write(part[0].toUpperCase());
+    if (part.length > 1) {
+      buffer.write(part.substring(1).toLowerCase());
+    }
+  }
+  return buffer.toString();
+}
+
 // ---------------------------------------------------------------------------
 // Type Utilities
 // ---------------------------------------------------------------------------
@@ -673,7 +721,8 @@ String generateDispatchCases(List<Map<String, dynamic>> codeModeTools) {
   final cases = codeModeTools
       .map((t) {
         final name = t['name'] as String;
-        return "      case '$name': result = await _$name(request); break;";
+        final camelHandlerName = t['camelCaseHandlerName'] as String? ?? name;
+        return "      case '$name': result = await _$camelHandlerName(request); break;";
       })
       .join('\n');
 

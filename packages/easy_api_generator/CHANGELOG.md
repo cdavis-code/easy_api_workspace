@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-05-25
+
+### Fixed
+
+- **Generated handler names now use valid Dart camelCase.** Snake_case tool
+  names (e.g. `obs_scenes_list` from OBS WebSocket request names) no longer
+  produce `non_constant_identifier_names` lint warnings in generated `.mcp.dart`
+  output. The MCP wire protocol string preserves the original snake_case while
+  the Dart handler method name is converted to camelCase (`_obsScenesList`).
+  Eliminates all 135 `non_constant_identifier_names` info-level issues that
+  collectively deducted 10 points from the pana static-analysis score.
+
+- **Generated `.dart` output is now auto-formatted.** The builder invokes
+  `dart format` on all generated `.mcp.dart`, `.openapi.dart`, and `.cli.dart`
+  files before writing them. Generated code now passes
+  `dart format --output=none --set-exit-if-changed` with zero changes needed,
+  matching the formatting expectation of downstream linters and CI pipelines.
+
+### Added
+
+- `snakeToCamelCase()` utility in `template_utils.dart` — converts snake_case
+  identifiers to lowerCamelCase while preserving leading underscores (critical
+  for private Dart member naming) and handling edge cases (all-uppercase
+  segments, consecutive underscores, already-camelCase passthrough).
+
+- `McpBuilder._formatDartCode()` — writes generated source to a temp file,
+  shells out to `dart format --output=write`, and reads the formatted result.
+  Falls back to unformatted output gracefully if `dart` is unavailable or
+  formatting fails.
+
+- 11 new tests for `snakeToCamelCase` conversion and camelCase handler name
+  generation in both stdio and HTTP templates.
+
 ## [1.2.1] - 2026-05-25
 
 ### Fixed
