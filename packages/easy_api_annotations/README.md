@@ -8,7 +8,7 @@ Dart annotations for exposing library methods as MCP tools, REST APIs, or both.
 
 Provides the core annotations used to declaratively describe Model Context Protocol (MCP) servers, REST endpoints, and their parameters — all from plain Dart code that is processed by the companion `easy_api_generator` build_runner package:
 
-- `@Server` — configures transport (stdio/HTTP), port/address, code mode, and which artifacts to generate (`.mcp.dart`, `.mcp.json`, `.openapi.dart`, `.openapi.json`).
+- `@Server` — configures transport (stdio/HTTP), port/address, code mode, and which artifacts to generate (`.mcp.dart`, `.mcp.json`, `.openapi.dart`, `.openapi.json`, `.cli.dart`).
 - `@Tool` — exposes a method as an MCP tool and/or REST endpoint, with optional custom naming, icons, and code-mode controls.
 - `@Parameter` *(optional)* — provides rich metadata for individual parameters: titles, descriptions, examples, validation (min/max, pattern, enum values), sensitivity flags, and external name aliases. The generator infers parameter info from Dart types by default, so you only need `@Parameter` when you want to add metadata beyond what's expressible in the method signature.
 
@@ -97,6 +97,7 @@ class MyServer {
 | `generateMcp` | `bool` | `true` | Whether to generate the MCP server (`.mcp.dart`) |
 | `generateJson` | `bool` | `false` | Whether to generate `.mcp.json` tool-metadata file |
 | `generateRest` | `bool` | `false` | Whether to generate a REST API server (`.openapi.dart`) and OpenAPI 3.0 spec (`.openapi.json`) |
+| `generateCli` | `bool` | `false` | Whether to generate a runnable command-line app (`.cli.dart`) that exposes annotated `@Tool` methods as `package:args` `CommandRunner` subcommands |
 | `toolPrefix` | `String?` | `null` | Prefix added to all tool names (e.g., `'user_'` makes `createUser` → `user_createUser`) |
 | `autoClassPrefix` | `bool` | `false` | Automatically prefix tool names with class name (e.g., `UserService_createUser`) |
 | `codeMode` | `bool` | `false` | Enables `search`/`execute` tools backed by a Node.js sandbox for batch tool orchestration |
