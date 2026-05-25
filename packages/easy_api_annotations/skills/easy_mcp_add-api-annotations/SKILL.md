@@ -1,6 +1,5 @@
 ---
-name: easy_mcp_add-api
--annotations
+name: easy_mcp_add-api-annotations
 description: Add easy_api annotations (@Server, @Tool, @Parameter, @Prompt) to existing Dart code to expose methods as MCP tools, REST API endpoints, or CLI applications. Use when converting Dart libraries to MCP/REST/CLI servers, adding tool exposure to existing functions, or when the user wants to make their Dart code callable via the Model Context Protocol, HTTP APIs, or command-line interfaces.
 ---
 
