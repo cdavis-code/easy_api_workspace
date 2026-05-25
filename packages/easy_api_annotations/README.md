@@ -1,7 +1,7 @@
 # easy_api_annotations
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/faithoflifedev/easy_api_workspace/refs/heads/main/images/logo-banner.svg" width="400" alt="easy_api">
+  <img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/packages/easy_api_annotations/images/banner.svg" width="600" alt="easy_api_annotations">
 </p>
 
 Dart annotations for exposing library methods as MCP tools, REST APIs, or both.

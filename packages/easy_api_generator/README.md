@@ -1,7 +1,7 @@
 # easy_api_generator
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/images/logo-banner.svg" width="400" alt="easy_api">
+  <img src="https://raw.githubusercontent.com/cdavis-code/easy_api_workspace/refs/heads/main/packages/easy_api_generator/images/banner.svg" width="600" alt="easy_api_generator">
 </p>
 
 Build Runner generator that creates MCP server code, REST API servers, OpenAPI 3.0 specs, and command-line apps from annotated Dart classes.
