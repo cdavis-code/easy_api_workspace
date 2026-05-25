@@ -20,7 +20,7 @@ Add this to your package's `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  easy_api_annotations: ^1.2.1
+  easy_api_annotations: ^1.2.2
 
 dev_dependencies:
   build_runner: ^2.4.0

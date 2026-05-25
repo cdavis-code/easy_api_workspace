@@ -5,13 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.1] - 2026-05-25
+## [1.2.2] - 2026-05-25
 
 ### Changed
 - Renamed the AI agent skill from `easy_mcp_add-server-annotations` to
   `easy_mcp_add-api-annotations` to reflect the broader scope of the package
   (MCP, REST, CLI, prompts).
-- Updated the skill (`skills/easy_mcp_add-api-annotations/SKILL.md`) to
+
+## [1.2.1] - 2026-05-25
+
+### Changed
+- Updated the skill (`skills/easy_mcp_add-server-annotations/SKILL.md`) to
   document the full annotation surface: `@Prompt` and `@PromptArgument` for MCP
   prompts, `generateCli` for CLI application generation, `corsOrigins` for HTTP
   transport CORS configuration, `@Parameter(alias:)` for external name mapping,
