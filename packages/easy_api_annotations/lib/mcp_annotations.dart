@@ -174,6 +174,43 @@ class Server {
   /// Defaults to `false`.
   final bool generateRest;
 
+  /// Whether to generate a command-line application (`.cli.dart`).
+  ///
+  /// When `true`, a standalone CLI application is generated using
+  /// `package:args`'s `CommandRunner`. Each annotated class becomes a
+  /// command group and each `@Tool` method becomes a subcommand. Tool
+  /// parameters become CLI options that respect the same validation
+  /// (`pattern`, `maxLength`, `minimum`, `maximum`, `enumValues`) used by
+  /// the MCP and REST artifacts.
+  ///
+  /// Complex object parameters (custom classes, lists of custom classes,
+  /// maps) are accepted as JSON. Both inline JSON strings and curl-style
+  /// `@path/to/file.json` references are supported.
+  ///
+  /// Results are emitted as JSON to stdout. Output is pretty-printed by
+  /// default; pass `--compact` for single-line JSON suitable for piping.
+  ///
+  /// Example:
+  /// ```dart
+  /// @Server(generateCli: true)
+  /// class UserStore {
+  ///   @Tool(description: 'Create a new user')
+  ///   static Future<User> createUser({
+  ///     required String name,
+  ///     required String email,
+  ///   }) async { ... }
+  /// }
+  /// ```
+  ///
+  /// Then run with:
+  /// ```bash
+  /// dart run bin/example.cli.dart user-store create-user \
+  ///   --name='Ada' --email='ada@example.com'
+  /// ```
+  ///
+  /// Defaults to `false`.
+  final bool generateCli;
+
   /// Whether to enable code mode for this MCP server.
   ///
   /// When true, generates `search` and `execute` tools that allow LLMs
@@ -277,7 +314,7 @@ class Server {
   /// Controls which origins can make requests to the MCP server.
   ///
   /// For production deployments, restrict this to specific origins to prevent
-  /// CSRF attacks. For local development, ['*'] allows all origins.
+  /// CSRF attacks. For local development, `['*']` allows all origins.
   ///
   /// Example:
   /// ```dart
@@ -287,7 +324,7 @@ class Server {
   /// )
   /// ```
   ///
-  /// Defaults to ['*'] for backward compatibility.
+  /// Defaults to `['*']` for backward compatibility.
   final List<String> corsOrigins;
 
   /// Creates a server configuration annotation.
@@ -300,11 +337,12 @@ class Server {
   /// [autoClassPrefix] automatically prefixes tool names with class name.
   /// [generateMcp] controls whether to generate MCP server code.
   /// [generateRest] controls whether to generate REST API server and OpenAPI spec.
+  /// [generateCli] controls whether to generate a CLI application using `package:args`.
   /// [codeMode] enables the search and execute tools for tool orchestration.
   /// [codeModeTimeout] sets the max execution time for code mode scripts.
   /// [logErrors] controls whether internal errors are logged to stderr.
   /// [annotationsDefault] provides server-wide defaults for tool annotation hints.
-  /// [corsOrigins] specifies allowed CORS origins for HTTP transport (default: ['*']).
+  /// [corsOrigins] specifies allowed CORS origins for HTTP transport (default: `['*']`).
   const Server({
     this.transport = McpTransport.stdio,
     this.generateJson = false,
@@ -314,6 +352,7 @@ class Server {
     this.autoClassPrefix = false,
     this.generateMcp = true,
     this.generateRest = false,
+    this.generateCli = false,
     this.codeMode = false,
     this.codeModeTimeout = 30,
     this.logErrors = false,
