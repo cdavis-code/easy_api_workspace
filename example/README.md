@@ -1186,3 +1186,15 @@ dart run example/bin/example.openapi.dart
 ---
 
 **Ready to test?** Start with `./launch_inspector.sh` for the best interactive experience!
+
+## License
+
+MIT — See [LICENSE](../LICENSE) for details.
+
+## Support
+
+If you find this package useful, consider supporting its development:
+
+<a href="https://buymeacoffee.com/cdavis" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" >
+</a>
